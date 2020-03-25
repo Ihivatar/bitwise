@@ -224,6 +224,8 @@ typedef struct Token
 
 Token token;
 const char* stream;
+const char* line_start;
+size_t line_number;
 
 const char* token_info(void)
 {
@@ -487,10 +489,14 @@ repeat:
         {
             while (isspace(*stream))
             {
-                ++stream;
+                if (*stream++ == '\n')
+                {
+                    line_start = stream;
+                    ++line_number;
+                }
             }
             goto repeat;
-        } break;
+        }
 
         case '\'':
         {
@@ -602,6 +608,26 @@ repeat:
             }
         } break;
 
+        case '/':
+        {
+            token.kind = TOKEN_DIV;
+            ++stream;
+            if (*stream == '=')
+            {
+                token.kind = TOKEN_DIV_ASSIGN;
+                ++stream;
+            }
+            else if (*stream == '/')
+            {
+                ++stream;
+                while (*stream && *stream != '\n')
+                {
+                    ++stream;
+                }
+                goto repeat;
+            }
+        } break;
+
         CASE1('\0', TOKEN_EOF)
         CASE1('(', TOKEN_LPAREN)
         CASE1(')', TOKEN_RPAREN)
@@ -618,7 +644,6 @@ repeat:
         CASE2('=', TOKEN_ASSIGN, '=', TOKEN_EQ)
         CASE2('^', TOKEN_XOR, '=', TOKEN_XOR_ASSIGN)
         CASE2('*', TOKEN_MUL, '=', TOKEN_MUL_ASSIGN)
-        CASE2('/', TOKEN_DIV, '=', TOKEN_DIV_ASSIGN)
         CASE2('%', TOKEN_MOD, '=', TOKEN_MOD_ASSIGN)
         CASE3('+', TOKEN_ADD, '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
         CASE3('-', TOKEN_SUB, '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
@@ -642,6 +667,8 @@ repeat:
 void init_stream(const char* str)
 {
     stream = str;
+    line_start = stream;
+    line_number = 1;
     next_token();
 }
 
