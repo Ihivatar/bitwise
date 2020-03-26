@@ -57,28 +57,20 @@ Typespec *parse_type(void) {
     return type;
 }
 
-CompoundField parse_expr_compound_field(void)
-{
-    if (match_token(TOKEN_LBRACKET))
-    {
-        Expr* index = parse_expr();
+CompoundField parse_expr_compound_field(void) {
+    if (match_token(TOKEN_LBRACKET)) {
+        Expr *index = parse_expr();
         expect_token(TOKEN_RBRACKET);
         expect_token(TOKEN_ASSIGN);
         return (CompoundField){FIELD_INDEX, parse_expr(), .index = index};
-    }
-    else
-    {
-        Expr* expr = parse_expr();
-        if (match_token(TOKEN_ASSIGN))
-        {
-            if (expr->kind != EXPR_NAME)
-            {
+    } else {
+        Expr *expr = parse_expr();
+        if (match_token(TOKEN_ASSIGN)) {
+            if (expr->kind != EXPR_NAME) {
                 fatal_syntax_error("Named initializer in compound literal must be preceded by field name");
             }
             return (CompoundField){FIELD_NAME, parse_expr(), .name = expr->name};
-        }
-        else
-        {
+        } else {
             return (CompoundField){FIELD_DEFAULT, expr};
         }
     }
@@ -86,7 +78,7 @@ CompoundField parse_expr_compound_field(void)
 
 Expr *parse_expr_compound(Typespec *type) {
     expect_token(TOKEN_LBRACE);
-    CompoundField* fields = NULL;
+    CompoundField *fields = NULL;
     if (!is_token(TOKEN_RBRACE)) {
         buf_push(fields, parse_expr_compound_field());
         while (match_token(TOKEN_COMMA)) {
@@ -182,9 +174,8 @@ Expr *parse_expr_base(void) {
     return expr;
 }
 
-bool is_unary_op(void)
-{
-    return 
+bool is_unary_op(void) {
+    return
         is_token(TOKEN_ADD) ||
         is_token(TOKEN_SUB) ||
         is_token(TOKEN_MUL) ||
@@ -583,18 +574,15 @@ Decl *parse_decl(void) {
     return decl;
 }
 
-DeclSet* parse_file(void)
-{
-    Decl** decls = NULL;
-    while (!is_token(TOKEN_EOF))
-    {
+DeclSet *parse_file(void) {
+    Decl **decls = NULL;
+    while (!is_token(TOKEN_EOF)) {
         buf_push(decls, parse_decl());
     }
     return decl_set(decls, buf_len(decls));
 }
 
 void parse_test(void) {
-    printf("parse_test()\n");
     const char *decls[] = {
         "var x: char[256] = {1, 2, 3, ['a'] = 4}",
         "struct Vector { x, y: float; }",
@@ -617,7 +605,7 @@ void parse_test(void) {
         "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
     };
     for (const char **it = decls; it != decls + sizeof(decls)/sizeof(*decls); it++) {
-        init_stream(*it);
+        init_stream(NULL, *it);
         Decl *decl = parse_decl();
         print_decl(decl);
         printf("\n");
