@@ -23,7 +23,8 @@ bool ion_compile_file(const char *path) {
 const char *ion_compile_str(const char *str) {
     init_stream(NULL, str);
     init_global_syms();
-    sym_global_decls(parse_file());
+    DeclSet* declset = parse_file();
+    sym_global_decls(declset);
     finalize_syms();
     gen_all();
     const char *result = gen_buf;

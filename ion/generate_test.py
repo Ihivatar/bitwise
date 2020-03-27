@@ -10,9 +10,9 @@ union IntOrPtr(?) {
 
 // func f(?)() {
 //    u1 := IntOrPtr(?){i = 42};
-//    u2 := IntOrPtr(?){p = cast(int*, 42)};
+//    u2 := IntOrPtr(?){p = (int*)42};
 //    u1.i = 0;
-//    u2.p = cast(int*, 0);
+//    u2.p = (int*)0;
 // }
 
 var i(?): int
@@ -46,8 +46,5 @@ struct T(?) {
 }
 """
 
-import re
-
-pattern = r"\(\?\)"
 for i in range(128 * 1024):
-    print(re.sub(pattern, str(i), template))
+    print(template_replace("(?)", str(i)))
