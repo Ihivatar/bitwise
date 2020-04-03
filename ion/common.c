@@ -266,7 +266,7 @@ typedef struct Map
     size_t cap;
 } Map;
 
-void *map_get(Map *map, void *key, uint64_t hash) {
+void *map_get(Map *map, void *key) {
     if (map->len == 0) {
         return NULL;
     }

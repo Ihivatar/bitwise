@@ -223,15 +223,41 @@ void error(SrcPos pos, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf("%s[%d]: ", pos.name, pos.line);
+    printf("%s(%d): ", pos.name, pos.line);
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
 }
 
-#define fataL_error(...) (error(__VA_ARGS__), exit(1))
-#define syntax_error(...) (error(token.pos, __VA_ARGS__))
-#define fatal_syntax_error(...) (syntax_error(__VA_ARGS__), exit(1))
+void fatal_error(SrcPos pos, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    error(pos, fmt, args);
+    va_end(args);
+    exit(1);
+}
+
+void syntax_error(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    error(token.pos, fmt, args);
+    va_end(args);
+}
+
+void fatal_syntax_error(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    syntax_error(fmt, args);
+    va_end(args);
+    exit(1);
+}
+
+//#define fataL_error(...) (error(__VA_ARGS__), exit(1))
+//#define syntax_error(...) (error(token.pos, __VA_ARGS__))
+//#define fatal_syntax_error(...) (syntax_error(__VA_ARGS__), exit(1))
 
 const char *token_info(void) {
     if (token.kind == TOKEN_NAME || token.kind == TOKEN_KEYWORD) {

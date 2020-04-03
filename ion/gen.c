@@ -9,7 +9,7 @@ int gen_indent;
 SrcPos gen_pos;
 
 const char* gen_preamble = \
-    "#include <stdio.h\n\n";
+    "#include <stdio.h>\n\n";
 
 void genln(void) {
     genf("\n%.*s", gen_indent * 4, "                                                                  ");
