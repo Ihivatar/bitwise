@@ -3,6 +3,18 @@ typedef struct Stmt Stmt;
 typedef struct Decl Decl;
 typedef struct Typespec Typespec;
 
+typedef struct Note
+{
+    SrcPos pos;
+    const char* name;
+} Note;
+
+typedef struct NoteList
+{
+    Note* notes;
+    size_t num_notes;
+} NoteList;
+
 struct Type;
 
 typedef struct StmtList {
@@ -29,6 +41,7 @@ struct Typespec {
             Typespec **args;
             size_t num_args;
             Typespec *ret;
+            bool variadic;
         } func;
         struct {
             Typespec *elem;
@@ -75,6 +88,7 @@ struct Decl {
     SrcPos pos;
     const char *name;
     struct Sym *sym;
+    NoteList notes;
     union {
         struct {
             EnumItem *items;
@@ -89,6 +103,7 @@ struct Decl {
             size_t num_params;
             Typespec *ret_type;
             StmtList block;
+            bool variadic;
         } func;
         struct {
             Typespec *type;

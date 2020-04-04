@@ -22,6 +22,8 @@ const char *first_keyword;
 const char *last_keyword;
 const char **keywords;
 
+const char* foreign_name;
+
 #define KEYWORD(name) name##_keyword = str_intern(#name); buf_push(keywords, name##_keyword)
 
 void init_keywords(void) {
@@ -52,6 +54,9 @@ void init_keywords(void) {
     assert(intern_arena.end == arena_end);
     first_keyword = typedef_keyword;
     last_keyword = default_keyword;
+
+    foreign_name = str_intern("foreign");
+
     inited = true;
 }
 
@@ -72,6 +77,8 @@ typedef enum TokenKind {
     TOKEN_RBRACKET,
     TOKEN_COMMA,
     TOKEN_DOT,
+    TOKEN_AT,
+    TOKEN_ELLIPSES,
     TOKEN_QUESTION,
     TOKEN_SEMICOLON,
     TOKEN_KEYWORD,
@@ -146,6 +153,8 @@ const char *token_kind_names[] = {
     [TOKEN_RBRACKET] = "]",
     [TOKEN_COMMA] = ",",
     [TOKEN_DOT] = ".",
+    [TOKEN_AT] = "@",
+    [TOKEN_ELLIPSES] = "...",
     [TOKEN_QUESTION] = "?",
     [TOKEN_SEMICOLON] = ";",
     [TOKEN_KEYWORD] = "keyword",
@@ -153,6 +162,7 @@ const char *token_kind_names[] = {
     [TOKEN_FLOAT] = "float",
     [TOKEN_STR] = "string",
     [TOKEN_NAME] = "name",
+    [TOKEN_NEG] = '~',
     [TOKEN_MUL] = "*",
     [TOKEN_DIV] = "/",
     [TOKEN_MOD] = "%",
@@ -217,6 +227,8 @@ typedef struct Token {
 Token token;
 const char *stream;
 const char *line_start;
+
+// TODO: Start here on day 15.
 
 void error(SrcPos pos, const char *fmt, ...) {
     va_list args;

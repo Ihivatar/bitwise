@@ -8,9 +8,19 @@ char *gen_buf = NULL;
 int gen_indent;
 SrcPos gen_pos;
 
-const char *gen_preamble = \
+const char *gen_preamble =
     "// Preamble\n"
-    "#include <stdio.h>\n\n";
+    "#include <stdio.h>\n"
+    "\n"
+    "typedef unsigned char uchar;\n"
+    "typedef signed char schar;\n"
+    "typedef unsigned short ushort;\n"
+    "typedef unsigned int uint;\n"
+    "typedef unsigned long ulong;\n"
+    "typedef long long llong;\n"
+    "typedef unsigned long long ullong;\n"
+    "\n"
+    ;
 
 void genln(void) {
     genf("\n%.*s", gen_indent * 4, "                                                                  ");
@@ -29,14 +39,14 @@ void gen_str(const char *str) {
     genf("\"");
     while (*str) {
         const char *start = str;
-        while (*str && !char_to_escape[*(unsigned char *)str]) {
+        while (*str && !char_to_escape[*(unsigned char)*str]) {
             str++;
         }
         if (start != str) {
             genf("%.*s", str - start, start);
         }
-        if (*str && char_to_escape[*(unsigned char *)str]) {
-            genf("\\%c", char_to_escape[*(unsigned char *)str]);
+        if (*str && char_to_escape[*(unsigned char)*str]) {
+            genf("\\%c", char_to_escape[*(unsigned char)*str]);
             str++;
         }
     }
@@ -58,34 +68,22 @@ const char *cdecl_paren(const char *str, bool b) {
     return b ? strf("(%s)", str) : str;
 }
 
-const char *cdecl_name(Type *type) {
-    switch (type->kind) {
-    case TYPE_VOID:
-        return "void";
-    case TYPE_CHAR:
-        return "char";
-    case TYPE_INT:
-        return "int";
-    case TYPE_FLOAT:
-        return "float";
-    case TYPE_STRUCT:
-    case TYPE_UNION:
+const char *cdecl_name(Type *type)
+{
+    const char* type_name = type_names[type->kind];
+    if (type_name)
+    {
+        return type_name;
+    }
+    else
+    {
+        assert(type->sym);
         return type->sym->name;
-    default:
-        assert(0);
-        return NULL;
     }
 }
 
 char *type_to_cdecl(Type *type, const char *str) {
     switch (type->kind) {
-    case TYPE_VOID:
-    case TYPE_CHAR:
-    case TYPE_INT:
-    case TYPE_FLOAT:
-    case TYPE_STRUCT:
-    case TYPE_UNION:
-        return strf("%s%s%s", cdecl_name(type), *str ? " " : "", str);
     case TYPE_PTR:
         return type_to_cdecl(type->ptr.elem, cdecl_paren(strf("*%s", str), *str));
     case TYPE_ARRAY:
@@ -100,12 +98,15 @@ char *type_to_cdecl(Type *type, const char *str) {
                 buf_printf(result, "%s%s", i == 0 ? "" : ", ", type_to_cdecl(type->func.params[i], ""));
             }
         }
+        if (type->func.variadic)
+        {
+            buf_printf(result, ", ...");
+        }
         buf_printf(result, ")");
         return type_to_cdecl(type->func.ret, result);
     }
     default:
-        assert(0);
-        return NULL;
+        return strf("%s%s%s", cdecl_name(type), *str ? " " : "", str);
     }
 }
 
@@ -139,6 +140,10 @@ char *typespec_to_cdecl(Typespec *typespec, const char *str) {
                 buf_printf(result, "%s%s", i == 0 ? "" : ", ", typespec_to_cdecl(typespec->func.args[i], ""));
             }
         }
+        if (typespec->func.variadic)
+        {
+            buf_printf(result, ", ...");
+        }
         buf_printf(result, ")");
         return typespec_to_cdecl(typespec->func.ret, result);
     }
@@ -166,6 +171,10 @@ void gen_func_decl(Decl *decl) {
             }
             genf("%s", typespec_to_cdecl(param.type, param.name));
         }
+    }
+    if (decl->func.variadic)
+    {
+        genf(", ...");
     }
     genf(")");
 }
@@ -228,6 +237,10 @@ void gen_expr_compound(Expr *expr, bool is_init) {
         }
         gen_expr(field.init);
     }
+    if (expr->compound.num_fields == 0)
+    {
+        genf("0");
+    }
     genf("}");
 }
 
@@ -273,22 +286,6 @@ void gen_expr(Expr *expr) {
         break;
     case EXPR_COMPOUND:
         gen_expr_compound(expr, false);
-        break;
-        for (size_t i = 0; i < expr->compound.num_fields; i++) {
-            if (i != 0) {
-                genf(", ");
-            }
-            CompoundField field = expr->compound.fields[i];
-            if (field.kind == FIELD_NAME) {
-                genf(".%s = ", field.name);
-            } else if (field.kind == FIELD_INDEX) {
-                genf("[");
-                gen_expr(field.index);
-                genf("] = ");
-            }
-            gen_expr(field.init);
-        }
-        genf("}");
         break;
     case EXPR_UNARY:
         genf("%s(", token_kind_name(expr->unary.op));
@@ -501,8 +498,11 @@ void gen_decl(Sym *sym) {
         genf(";");
         break;
     case DECL_FUNC:
-        gen_func_decl(decl);
-        genf(";");
+        if (!is_decl_foreign(decl))
+        {
+            gen_func_decl(decl);
+            genf(";");
+        }
         break;
     case DECL_STRUCT:
     case DECL_UNION:
@@ -544,10 +544,13 @@ void gen_func_defs(void) {
         Sym *sym = *it;
         Decl *decl = sym->decl;
         if (decl && decl->kind == DECL_FUNC) {
-            gen_func_decl(decl);
-            genf(" ");
-            gen_stmt_block(decl->func.block);
-            genln();
+            if (!is_decl_foreign(decl))
+            {
+                gen_func_decl(decl);
+                genf(" ");
+                gen_stmt_block(decl->func.block);
+                genln();
+            }
         }
     }
 }
