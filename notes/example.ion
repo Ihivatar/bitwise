@@ -1,14 +1,12 @@
-enum ExprKind
-{
+enum ExprKind {
     ADD
     MUL
-    ADD
+    SUB
     DIV
     NEG
 }
 
-struct Expr
-{
+struct Expr {
     kind: ExprKind
     left, right: Expr*
 }
@@ -17,47 +15,36 @@ var pi = 3.14
 
 const MAX_EXPRS = 1024
 
-func fact_rec(n: int): int
-{
-    if (n == 0)
-    {
+func fact_rec(n: int): int {
+    if (n == 0) {
         return 1
-    }
-    else
-    {
+    } else {
         return n * fact_rec(n-1)
     }
 }
 
-func fact_iter(n: int): int
-{
+func fact_iter(n: int): int {
     r := 1
-    for (i := 1; i <= n; i++)
-    {
+    for (i := 1; i <= n; i++) {
         r *= i
     }
     return r
 }
 
-struct Vector
-{
+struct Vector {
     x, y: float
 }
 
-struct Rect
-{
+struct Rect {
     pos, size: Vector
 }
 
-func make_rect(min, max: Vector): Rect
-{
+func make_rect(min, max: Vector): Rect {
     return Rect{{min.x, min.y}, {max.x - min.x, max.y - min.y}}
 }
 
-func make_rect(min, max: Vector): Rect
-{
-    return
-    {
+func make_rect(min, max: Vector): Rect {
+    return {
         pos = {min.x, min.y},
         size = {max.x - min.x, max.y - min.y}
     }
@@ -70,29 +57,27 @@ func make_rect(min, max: Vector): Rect
 // and: &&
 // or: ||
 
-if (a & b == 0)
-{
-    // means if ((a & b) == 0)
+if (a & b == 0) { // means if ((a & b) == 0) { ...
 }
 
-if (a == b || c == d)
-{
-    // if ((a == b) || (c == d))
-}
+if (a == b || c == d) { // if ((a == b) || (c == d)) {
+
 
 make_vect({a, b}, {c, d})
 
-var f: Rect = {{a, b}, {c, d}}
+var r: Rect = {{a, b}, {c, d}}
 
 r := Rect{{a, b}, {c, d}}
 
 {}
 
-// all .ion files in a directory (except for special kinds of names)
-// are considered part of the same translation unit automatically
+/*
+all .ion files in a directory (exept for special kinds of names)
+are considered part of the same translation unit automatically
 
-// foo/a.ion
-// foo/b.ion
-// foo/c.ion
+foo/a.ion
+foo/b.ion
+foo/c.ion
 
-// import foo
+import foo
+*/

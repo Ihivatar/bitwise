@@ -195,9 +195,8 @@ const char *token_kind_name(TokenKind kind) {
     }
 }
 
-typedef struct SrcPos
-{
-    const char* name;
+typedef struct SrcPos {
+    const char *name;
     int line;
 } SrcPos;
 
@@ -208,7 +207,7 @@ typedef struct Token {
     const char *start;
     const char *end;
     union {
-        int64_t int_val;
+        int int_val;
         double float_val;
         const char *str_val;
         const char *name;
@@ -219,8 +218,7 @@ Token token;
 const char *stream;
 const char *line_start;
 
-void error(SrcPos pos, const char* fmt, ...)
-{
+void error(SrcPos pos, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     printf("%s(%d): ", pos.name, pos.line);
@@ -229,35 +227,9 @@ void error(SrcPos pos, const char* fmt, ...)
     va_end(args);
 }
 
-void fatal_error(SrcPos pos, const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    error(pos, fmt, args);
-    va_end(args);
-    exit(1);
-}
-
-void syntax_error(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    error(token.pos, fmt, args);
-    va_end(args);
-}
-
-void fatal_syntax_error(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    syntax_error(fmt, args);
-    va_end(args);
-    exit(1);
-}
-
-//#define fataL_error(...) (error(__VA_ARGS__), exit(1))
-//#define syntax_error(...) (error(token.pos, __VA_ARGS__))
-//#define fatal_syntax_error(...) (syntax_error(__VA_ARGS__), exit(1))
+#define fatal_error(...) (error(__VA_ARGS__), exit(1))
+#define syntax_error(...) (error(token.pos, __VA_ARGS__))
+#define fatal_syntax_error(...) (syntax_error(__VA_ARGS__), exit(1))
 
 const char *token_info(void) {
     if (token.kind == TOKEN_NAME || token.kind == TOKEN_KEYWORD) {
@@ -287,7 +259,7 @@ uint8_t char_to_digit[256] = {
 };
 
 void scan_int(void) {
-    uint64_t base = 10;
+    int base = 10;
     if (*stream == '0') {
         stream++;
         if (tolower(*stream) == 'x') {
@@ -303,9 +275,9 @@ void scan_int(void) {
             base = 8;
         }
     }
-    uint64_t val = 0;
+    int val = 0;
     for (;;) {
-        uint64_t digit = char_to_digit[*(unsigned char *)stream];
+        int digit = char_to_digit[*(unsigned char *)stream];
         if (digit == 0 && *stream != '0') {
             break;
         }
@@ -313,7 +285,7 @@ void scan_int(void) {
             syntax_error("Digit '%c' out of range for base %" PRIu64, *stream, base);
             digit = 0;
         }
-        if (val > (UINT64_MAX - digit)/base) {
+        if (val > (INT_MAX - digit)/base) {
             syntax_error("Integer literal overflow");
             while (isdigit(*stream)) {
                 stream++;
@@ -663,11 +635,11 @@ void lex_test(void) {
     assert(str_intern("func") == func_keyword);
 
     // Integer literal tests
-    init_stream(NULL, "0 18446744073709551615 0xffffffffffffffff 042 0b1111");
+    init_stream(NULL, "0 2147483647 0x7fffffff 042 0b1111");
     assert_token_int(0);
-    assert_token_int(18446744073709551615ull);
+    assert_token_int(2147483647);
     assert(token.mod == TOKENMOD_HEX);
-    assert_token_int(0xffffffffffffffffull);
+    assert_token_int(0x7fffffff);
     assert(token.mod == TOKENMOD_OCT);
     assert_token_int(042);
     assert(token.mod == TOKENMOD_BIN);

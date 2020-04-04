@@ -8,7 +8,8 @@ char *gen_buf = NULL;
 int gen_indent;
 SrcPos gen_pos;
 
-const char* gen_preamble = \
+const char *gen_preamble = \
+    "// Preamble\n"
     "#include <stdio.h>\n\n";
 
 void genln(void) {
@@ -16,44 +17,39 @@ void genln(void) {
     gen_pos.line++;
 }
 
-char char_to_escape[256] =
-{
-    // TODO(nicholas): Need to expand this and also deal with non-printable chars via \x
+char char_to_escape[256] = {
+    // TODO: Need to expand this and also deal with non-printable chars via \x
     ['\n'] = 'n',
     ['\\'] = '\\',
-    ['*'] = '*',
-    ['\''] = '\''
+    ['"'] = '"',
+    ['\''] = '\'',
 };
 
-void gen_str(const char* str)
-{
+void gen_str(const char *str) {
     genf("\"");
-    while (*str)
-    {
-        const char* start = str;
-        while (*str && !char_to_escape[*(unsigned char*)str])
-        {
-            ++str;
+    while (*str) {
+        const char *start = str;
+        while (*str && !char_to_escape[*(unsigned char *)str]) {
+            str++;
         }
-        if (start != str)
-        {
+        if (start != str) {
             genf("%.*s", str - start, start);
         }
-        if (*str && char_to_escape[*(unsigned char*)str])
-        {
-            genf("\\%c", char_to_escape[*(unsigned char*)str]);
-            ++str;
+        if (*str && char_to_escape[*(unsigned char *)str]) {
+            genf("\\%c", char_to_escape[*(unsigned char *)str]);
+            str++;
         }
     }
     genf("\"");
 }
 
-void gen_sync_pos(SrcPos pos)
-{
-    if (gen_pos.line != pos.line || gen_pos.name != pos.name)
-    {
+void gen_sync_pos(SrcPos pos) {
+    if (gen_pos.line != pos.line || gen_pos.name != pos.name) {
         genlnf("#line %d", pos.line);
-        gen_str(pos.name);
+        if (gen_pos.name != pos.name) {
+            genf(" ");
+            gen_str(pos.name);
+        }
         gen_pos = pos;
     }
 }
@@ -175,9 +171,8 @@ void gen_func_decl(Decl *decl) {
 }
 
 void gen_forward_decls(void) {
-    for (Sym** it = global_syms_buf; it != buf_end(global_syms_buf); ++it)
-    {
-        Sym* sym = *it;
+    for (Sym **it = global_syms_buf; it != buf_end(global_syms_buf); it++) {
+        Sym *sym = *it;
         Decl *decl = sym->decl;
         if (!decl) {
             continue;
@@ -188,10 +183,6 @@ void gen_forward_decls(void) {
             break;
         case DECL_UNION:
             genlnf("typedef union %s %s;", sym->name, sym->name);
-            break;
-        case DECL_FUNC:
-            gen_func_decl(sym->decl);
-            genf(";");
             break;
         default:
             // Do nothing.
@@ -206,13 +197,38 @@ void gen_aggregate(Decl *decl) {
     gen_indent++;
     for (size_t i = 0; i < decl->aggregate.num_items; i++) {
         AggregateItem item = decl->aggregate.items[i];
-        gen_sync_pos(item.pos);
         for (size_t j = 0; j < item.num_names; j++) {
+            gen_sync_pos(item.pos);
             genlnf("%s;", typespec_to_cdecl(item.type, item.names[j]));
         }
     }
     gen_indent--;
     genlnf("};");
+}
+
+void gen_expr_compound(Expr *expr, bool is_init) {
+    if (is_init) {
+        genf("{");
+    } else if (expr->compound.type) {
+        genf("(%s){", typespec_to_cdecl(expr->compound.type, ""));
+    } else {
+        genf("(%s){", type_to_cdecl(expr->type, ""));
+    }
+    for (size_t i = 0; i < expr->compound.num_fields; i++) {
+        if (i != 0) {
+            genf(", ");
+        }
+        CompoundField field = expr->compound.fields[i];
+        if (field.kind == FIELD_NAME) {
+            genf(".%s = ", field.name);
+        } else if (field.kind == FIELD_INDEX) {
+            genf("[");
+            gen_expr(field.index);
+            genf("] = ");
+        }
+        gen_expr(field.init);
+    }
+    genf("}");
 }
 
 void gen_expr(Expr *expr) {
@@ -256,11 +272,8 @@ void gen_expr(Expr *expr) {
         genf(".%s", expr->field.name);
         break;
     case EXPR_COMPOUND:
-        if (expr->compound.type) {
-            genf("(%s){", typespec_to_cdecl(expr->compound.type, ""));
-        } else {
-            genf("(%s){", type_to_cdecl(expr->type, ""));
-        }
+        gen_expr_compound(expr, false);
+        break;
         for (size_t i = 0; i < expr->compound.num_fields; i++) {
             if (i != 0) {
                 genf(", ");
@@ -323,6 +336,14 @@ void gen_stmt_block(StmtList block) {
     genlnf("}");
 }
 
+void gen_init_expr(Expr *expr) {
+    if (expr->kind == EXPR_COMPOUND) {
+        gen_expr_compound(expr, true);
+    } else {
+        gen_expr(expr);
+    }
+}
+
 void gen_simple_stmt(Stmt *stmt) {
     switch (stmt->kind) {
     case STMT_EXPR:
@@ -330,7 +351,7 @@ void gen_simple_stmt(Stmt *stmt) {
         break;
     case STMT_INIT:
         genf("%s = ", type_to_cdecl(stmt->init.expr->type, stmt->init.name));
-        gen_expr(stmt->init.expr);
+        gen_init_expr(stmt->init.expr);
         break;
     case STMT_ASSIGN:
         gen_expr(stmt->assign.left);
@@ -431,7 +452,15 @@ void gen_stmt(Stmt *stmt) {
                 genlnf("default:");
             }
             genf(" ");
-            gen_stmt_block(switch_case.block);
+            genf("{");
+            gen_indent++;
+            StmtList block = switch_case.block;
+            for (size_t j = 0; i < block.num_stmts; i++) {
+                gen_stmt(block.stmts[j]);
+            }
+            genlnf("break;");
+            gen_indent--;
+            genlnf("}");
         }
         genlnf("}");
         break;
@@ -443,14 +472,11 @@ void gen_stmt(Stmt *stmt) {
     }
 }
 
-void gen_func(Decl *decl) {
-    assert(decl->kind == DECL_FUNC);
-    gen_func_decl(decl);
-    genf(" ");
-    gen_stmt_block(decl->func.block);
+bool is_incomplete_array_type(Typespec *typespec) {
+    return typespec->kind == TYPESPEC_ARRAY && !typespec->array.size;
 }
 
-void gen_sym(Sym *sym) {
+void gen_decl(Sym *sym) {
     Decl *decl = sym->decl;
     if (!decl) {
         return;
@@ -463,36 +489,38 @@ void gen_sym(Sym *sym) {
         genf(" };");
         break;
     case DECL_VAR:
-        if (decl->var.type) {
+        if (decl->var.type && !is_incomplete_array_type(decl->var.type)) {
             genlnf("%s", typespec_to_cdecl(decl->var.type, sym->name));
         } else {
             genlnf("%s", type_to_cdecl(sym->type, sym->name));
         }
         if (decl->var.expr) {
             genf(" = ");
-            gen_expr(decl->var.expr);
+            gen_init_expr(decl->var.expr);
         }
         genf(";");
         break;
     case DECL_FUNC:
-        gen_func(sym->decl);
+        gen_func_decl(decl);
+        genf(";");
         break;
     case DECL_STRUCT:
     case DECL_UNION:
-        gen_aggregate(sym->decl);
+        gen_aggregate(decl);
         break;
     case DECL_TYPEDEF:
-        genlnf("typedef %s;", type_to_cdecl(sym->type, sym->name));
+        genlnf("typedef %s;", typespec_to_cdecl(decl->typedef_decl.type, sym->name));
         break;
     default:
         assert(0);
         break;
     }
+    genln();
 }
 
-void gen_ordered_decls(void) {
-    for (size_t i = 0; i < buf_len(ordered_syms); i++) {
-        gen_sym(ordered_syms[i]);
+void gen_sorted_decls(void) {
+    for (size_t i = 0; i < buf_len(sorted_syms); i++) {
+        gen_decl(sorted_syms[i]);
     }
 }
 
@@ -511,100 +539,27 @@ void cdecl_test(void) {
     #endif
 }
 
+void gen_func_defs(void) {
+    for (Sym **it = global_syms_buf; it != buf_end(global_syms_buf); it++) {
+        Sym *sym = *it;
+        Decl *decl = sym->decl;
+        if (decl && decl->kind == DECL_FUNC) {
+            gen_func_decl(decl);
+            genf(" ");
+            gen_stmt_block(decl->func.block);
+            genln();
+        }
+    }
+}
+
 void gen_all(void) {
     gen_buf = NULL;
     genf("%s", gen_preamble);
     genf("// Forward declarations");
     gen_forward_decls();
     genln();
-    genlnf("// Ordered declarations");
-    gen_ordered_decls();
+    genlnf("// Sorted declarations");
+    gen_sorted_decls();
+    genlnf("// Function definitions");
+    gen_func_defs();
 }
-
-void gen_test(void) {
-    cdecl_test();
-
-    const char *code = 
-        "func example_test(): int { return fact_rec(10) == fact_iter(10); }\n"
-        "union IntOrPtr { i: int; p: int*; }\n"
-        "// func f() {\n"
-        "//     u1 := IntOrPtr{i = 42};\n"
-        "//     u2 := IntOrPtr{p = (int*)42};\n"
-        "//     u1.i = 0;\n"
-        "//     u2.p = (int*)0;\n"
-        "// }\n"
-        "var i: int\n"
-        "struct Vector { x, y: int; }\n"
-        "func fact_iter(n: int): int { r := 1; for (i := 2; i <= n; i++) { r *= i; } return r; }\n"
-        "func fact_rec(n: int): int { if (n == 0) { return 1; } else { return n * fact_rec(n-1); } }\n"
-#if 0
-        "func f1() { v := Vector{1, 2}; j := i; i++; j++; v.x = 2*j; }\n"
-        "func f2(n: int): int { return 2*n; }\n"
-        "func f3(x: int): int { if (x) { return -x; } else if (x % 2 == 0) { return 42; } else { return -1; } }\n"
-        "func f4(n: int): int { for (i := 0; i < n; i++) { if (i % 3 == 0) { return n; } } return 0; }\n"
-        "func f5(x: int): int { switch(x) { case 0: case 1: return 42; case 3: default: return -1; } }\n"
-        "func f6(n: int): int { p := 1; while (n) { p *= 2; n--; } return p; }\n"
-        "func f7(n: int): int { p := 1; do { p *= 2; n--; } while (n); return p; }\n"
-#endif
-        "const n = 1+sizeof(p)\n"
-        "var p: T*\n"
-        "struct T { a: int[n]; }\n"
-        ;
-
-    init_stream(NULL, code);
-    init_global_syms();
-    sym_global_decls(parse_file());
-    finalize_syms();
-
-    gen_all();
-    printf("%s\n", gen_buf);
-
-#if 0
-    extern int example_test(void);
-    printf("example_test() == %d\n", example_test());
-#endif
-}
-
-#if 0
-// Forward declarations
-int example_test(void);
-typedef union IntOrPtr IntOrPtr;
-void f(void);
-typedef struct Vector Vector;
-int fact_iter(int n);
-int fact_rec(int n);
-typedef struct T T;
-
-// Ordered declarations
-int example_test(void) {
-    return (fact_rec(10)) == (fact_iter(10));
-}
-int fact_rec(int n) {
-    if ((n) == (0)) {
-        return 1;
-    } else {
-        return (n) * (fact_rec((n) - (1)));
-    }
-}
-int fact_iter(int n) {
-    int r = 1;
-    for (int i = 2; (i) <= (n); i++) {
-        r *= i;
-    }
-    return r;
-}
-union IntOrPtr {
-    int i;
-    int (*p);
-};
-int i;
-struct Vector {
-    int x;
-    int y;
-};
-T (*p);
-enum { n = (1) + (sizeof(p)) };
-struct T {
-    int (a[n]);
-};
-#endif
