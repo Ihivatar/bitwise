@@ -7,11 +7,28 @@ Expr *parse_expr(void);
 Typespec *parse_type_func(void) {
     SrcPos pos = token.pos;
     Typespec **args = NULL;
+    bool variadic = false;
     expect_token(TOKEN_LPAREN);
     if (!is_token(TOKEN_RPAREN)) {
         buf_push(args, parse_type());
-        while (match_token(TOKEN_COMMA)) {
-            buf_push(args, parse_type());
+        while (match_token(TOKEN_COMMA))
+        {
+            if (match_token(TOKEN_ELLIPSES))
+            {
+                if (variadic)
+                {
+                    syntax_error("Multiple ellipsis instances in function type");
+                }
+                variadic = true;
+            }
+            else
+            {
+                if (variadic)
+                {
+                    syntax_error("Ellipsis must be last parameter in function type");
+                }
+                buf_push(args, parse_type());
+            }
         }
     }
     expect_token(TOKEN_RPAREN);
@@ -19,7 +36,7 @@ Typespec *parse_type_func(void) {
     if (match_token(TOKEN_COLON)) {
         ret = parse_type();
     }
-    return typespec_func(pos, args, buf_len(args), ret);
+    return typespec_func(pos, args, buf_len(args), ret, variadic);
 }
 
 Typespec *parse_type_base(void) {
@@ -553,10 +570,27 @@ Decl *parse_decl_func(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_LPAREN);
     FuncParam *params = NULL;
+    bool variadic = false;
     if (!is_token(TOKEN_RPAREN)) {
         buf_push(params, parse_decl_func_param());
-        while (match_token(TOKEN_COMMA)) {
-            buf_push(params, parse_decl_func_param());
+        while (match_token(TOKEN_COMMA))
+        {
+            if (match_token(TOKEN_ELLIPSES))
+            {
+                if (variadic)
+                {
+                    syntax_error("Multiple ellipsis in function declaration");
+                }
+                variadic = true;
+            }
+            else
+            {
+                if (variadic)
+                {
+                    syntax_error("Ellipsis must be last parameter in function declaration");
+                }
+                buf_push(params, parse_decl_func_param());
+            }
         }
     }
     expect_token(TOKEN_RPAREN);
@@ -565,7 +599,17 @@ Decl *parse_decl_func(SrcPos pos) {
         ret_type = parse_type();
     }
     StmtList block = parse_stmt_block();
-    return decl_func(pos, name, params, buf_len(params), ret_type, block);
+    return decl_func(pos, name, params, buf_len(params), ret_type, variadic, block);
+}
+
+NoteList parse_note_list(void)
+{
+    Note* notes = NULL;
+    while (match_token(TOKEN_AT))
+    {
+        buf_push(notes, (Note){.pos = token.pos, .name = parse_name()});
+    }
+    return note_list(notes, buf_len(notes));
 }
 
 Decl *parse_decl_opt(void) {
@@ -590,10 +634,12 @@ Decl *parse_decl_opt(void) {
 }
 
 Decl *parse_decl(void) {
+    NoteList notes = parse_note_list();
     Decl *decl = parse_decl_opt();
     if (!decl) {
         fatal_syntax_error("Expected declaration keyword, got %s", token_info());
     }
+    decl->notes = notes;
     return decl;
 }
 

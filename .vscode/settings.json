@@ -3,6 +3,7 @@
         "sstream": "c",
         "iterator": "c",
         "memory": "c",
-        "random": "c"
+        "random": "c",
+        "locale": "c"
     }
 }
