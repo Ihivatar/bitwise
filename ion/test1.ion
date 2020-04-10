@@ -1,11 +1,14 @@
 @foreign
-func printf(fmt: char*, ...): int {}
+func printf(fmt: char const*, ...): int { return 0; }
 
 @foreign
-func puts(fmt: char*): int {}
+func puts(str: char const*): int { return 0; }
 
 @foreign
-func getchar(): int {}
+func getchar(): int { return 0; }
+
+const PI = 3.14;
+const PI2 = PI + PI;
 
 var c: char = 1
 var uc: uchar = 1
@@ -15,13 +18,86 @@ const N = (:char)42 + 8 != 0
 
 typedef A = int[1 + 2*sizeof(h())]
 
+var code = """
+#include <stdio.h>
+
+int main(int argc, char** argv)
+{
+    printf("Hello, world!\n");
+    return 0;
+}
+""";
+
+struct S1
+{
+    a: int;
+    b: int const;
+}
+
+struct S2
+{
+    s1: S1;
+}
+
+func f10(a: int[3])
+{
+    a[1] = 42;
+}
+
+func test_arrays()
+{
+    a: int[] = {1, 2, 3};
+    f10(a);
+}
+
+func test_nonmodifiable()
+{
+    s1: S1;
+    s1.a = 0;
+    // s1.b = 0;
+    // s1 = {};
+    s2: S2;
+    s2.s1.a = 0;
+    // s2.s1.b = 0;
+    // s2.s1 = {};
+    // s2 = {};
+}
+
+struct UartCtrl
+{
+    tx_enable, rx_enable: bool;
+}
+
+const UART_CTRL = (:uint32*)0x12345678;
+
+func pack(ctrl: UartCtrl): uint32
+{
+    return (ctrl.tx_enable & 1) | ((ctrl.rx_enable & 1) << 1);
+}
+
+func unpack(word: uint32): UartCtrl
+{
+    return (tx_enable = word & 0b01, rx_enable = (word & 0b10) >> 1);
+}
+
+func test_uart()
+{
+    tx_enable := unpack("UART_CTRL).tx_enable;
+    *UART_CTRL = pack((tx_enable = !tx_enable, rx_enable = false});
+    ctrl := unpack(*UART_CTRL);
+    ctrl.rx_enable = true;
+    *UART_CTRL = pack(ctrl);
+}
+
 func h(): uchar
 {
     Vector{x = 1, y = 2}.x = 42;
+    v := &Vector{1, 2};
+    v.x = 42;
     p := &int{0};
     x := uint{1} + long{2};
     y := +c;
-    return x;
+    return uchar(x);
 }
 
 func g(u: U): int {
@@ -40,6 +116,11 @@ func f1()
     *p = 42;
 }
 
+func f3(a: int[])
+{
+
+}
+
 typedef U = IntOrPtr
 
 func example_test(): int {
@@ -51,7 +132,7 @@ union IntOrPtr {
     p: int*;
 }
 
-var escape_to_char: int[256] = {
+var escape_to_char: char const[256] = {
     ['n'] = '\n',
     ['r'] = '\r',
     ['t'] = '\t',
@@ -59,9 +140,10 @@ var escape_to_char: int[256] = {
     ['b'] = '\b',
     ['a'] = '\a',
     ['0'] = 0,
-}
+};
 
-var array: int[] = {1, 2, 3, [10]=4}
+var a2: int[] = {1, 2, 3, [10] = 4};
+// var a3: int[];
 
 func is_even(digit: int): int {
     b := 0;
@@ -79,7 +161,7 @@ func is_even(digit: int): int {
 //     u2.p = (:int*)0;
 // }
 
-var i: int
+var i: int;
 
 struct Vector {
     x, y: int;
@@ -106,12 +188,61 @@ func fact_rec(n: int): int {
     }
 }
 
-const n = 1 + sizeof(p)
+const M = 1 + sizeof(p);
 
-var p: T*
+var p: T*;
 
 struct T {
-    a: int[n];
+    a: int[M];
+}
+
+enum Color
+{
+    COLOR_NONE,
+    COLOR_RED,
+    COLOR_GREEN,
+    COLOR_BLUE,
+    NUM_COLORS
+}
+
+var color_names: char const*[NUM_COLORS] =
+{
+    [COLOR_NONE] = "none",
+    [COLOR_RED] = "red",
+    [COLOR_GREEN] = "green",
+    [COLOR_BLUE] = "blue"
+};
+
+func test_enum()
+{
+    a: Color = COLOR_RED;
+    b := COLOR_RED;
+    c := a + b;
+    i: int = a;
+    a = i;
+    printf("%d %d %d %d\n", COLOR_NONE, COLOR_RED, COLOR_GREEN, COLOR_BLUE);
+}
+
+func test_assign()
+{
+    i: int = 0;
+    f: float = 3.14;
+    p: int* + &i;
+    i++;
+    i--;
+    p++;
+    p--;
+    p += 1;
+    i /= 2;
+    i *= 123;
+    i %= 3;
+    i <<= 1;
+    i >>= 2;
+    i &= 0xff;
+    i |= 0xff00;
+    i ^= 0x0ff0;
+    // f++;
+    // f--;
 }
 
 func benchmark(n: int) {
@@ -126,7 +257,23 @@ func va_test(x: int, ...): int
     return 0;
 }
 
-typedef F = func(int, ...): int
+typedef F = func(x: int, ...): int
+
+func test_lits()
+{
+    f := 3.14;
+    d := 3.14d;
+    i := 1;
+    u := 0xffffffffu;
+    l := 1l;
+    ul := 1ul;
+    ll := 0x100000000ll;
+    ull := 0xffffffffffffffffull;
+    x1 := 0xffffffff;
+    x2 := 4294967295;
+    x3 := 0xffffffffffffffff;
+    x4 := 0b10101010 + 0b01010101;
+}
 
 func test_ops()
 {
@@ -136,13 +283,13 @@ func test_ops()
     f = -pi;
     n := -1;
     n = ~n;
-    f = f * pi;
+    f = f * pi + n;
     f = pi / pi;
     n = 3 % 2;
     n = n + (:uchar)1;
     p := &n;
     p = p + 1;
-    n = (p + 1) - p;
+    n = int((p + 1) - p);
     n = n << 1;
     n = n >> 1;
     b := p + 1 > p;
@@ -159,8 +306,119 @@ func test_ops()
     b = p && pi;
 }
 
+const IS_DEBUG = true;
+
+func test_bool()
+{
+    b := false;
+    b = true;
+    i := 0;
+    i = IS_DEBUG;
+}
+
+func test_ctrl(): int
+{
+    switch (1)
+    {
+        case 0:
+            return 0;
+        default:
+            return 1;
+    }
+// return 0;
+}
+
+var j: int const;
+var q: int const*;
+var cv: Vector const;
+
+func f4(x: char const*)
+{
+
+}
+
+struct ConstVector
+{
+    x, y: int const;
+}
+
+func f5(p: int const*)
+{
+
+}
+
+func test_convert()
+{
+    a: int const* = 0;
+    b: int* = 0;
+    a = b;
+    p: void* = 0;
+    f5(p);
+}
+
+func test_const()
+{
+    cv2 := ConstVector{1, 2};
+    // cv2 = {};
+    i := 0;
+    i = 1;
+    // j = 0;
+    // *q = 0;
+    x := cv.x;
+    // cv.x = {};
+    c := escape_to_char[0];
+    // escape_to_char[0] = 0;
+    f4(escape_to_char);
+    p := (:char const*)0; // (:int*)0
+    p = escape_to_char + 1;
+    q := (:char*)escape_to_char;
+    c = q['n'];
+    // q = escape_to_char;
+    p = (:char const*)1;
+    // p = 1;
+    // i = p;
+    i = int(ullong(p));
+}
+
+func test_init()
+{
+    x := (:int const)0;
+    y: int;
+    y = 0;
+    z: int = 42;
+    a: int[] = {1, 2, 3};
+    // a2: int[];
+    // v: void;
+    for (i: ullong = 0; i < 10; i++)
+    {
+        printf("%llu\n", i);
+    }
+}
+
+func test_cast()
+{
+    p: int* = 0;
+    a: uint64 = 0;
+    // a = p;
+    a = uint64(p);
+    // p = a;
+    p = (:int*)a;
+}
+
 func main(argc: int, argv: char**): int
 {
+    if (argv == 0)
+    {
+        printf("argv is null\n");
+    }
+    test_assign();
+    test_enum();
+    test_arrays();
+    test_cast();
+    test_init();
+    test_lits();
+    test_const();
+    test_bool();
     test_ops();
     b := example_test();
     puts("Hello, world!");
@@ -168,5 +426,6 @@ func main(argc: int, argv: char**): int
     printf("You wrote '%c'\n", c);
     va_test(1);
     va_test(1, 2);
+    argv = NULL;
     return 0;
 }

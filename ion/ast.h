@@ -29,27 +29,23 @@ typedef enum TypespecKind {
     TYPESPEC_FUNC,
     TYPESPEC_ARRAY,
     TYPESPEC_PTR,
+    TYPESPEC_CONST,
 } TypespecKind;
 
 struct Typespec {
     TypespecKind kind;
     SrcPos pos;
     struct Type *type;
+    Typespec* base;
     union {
         const char *name;
         struct {
             Typespec **args;
             size_t num_args;
             Typespec *ret;
-            bool variadic;
+            bool has_varargs;
         } func;
-        struct {
-            Typespec *elem;
-            Expr *size;
-        } array;
-        struct {
-            Typespec *elem;
-        } ptr;
+        Expr* num_elems;
     };
 };
 
@@ -103,7 +99,7 @@ struct Decl {
             size_t num_params;
             Typespec *ret_type;
             StmtList block;
-            bool variadic;
+            bool has_varargs;
         } func;
         struct {
             Typespec *type;
@@ -162,9 +158,19 @@ struct Expr {
     SrcPos pos;
     struct Type *type;
     union {
-        int int_val;
-        double float_val;
-        const char *str_val;
+        struct {
+            unsigned long long val;
+            TokenMod mod;
+            TokenSuffix suffix;
+        } int_lit;
+        struct {
+            double val;
+            TokenSuffix suffix;
+        } float_lit;
+        struct {
+            const char* val;
+            TokenMod mod;
+        } str_lit;
         const char *name;
         Expr *sizeof_expr;
         Typespec *sizeof_type;
@@ -272,6 +278,7 @@ struct Stmt {
         } assign;
         struct {
             const char *name;
+            Typespec* type;
             Expr *expr;
         } init;
     };

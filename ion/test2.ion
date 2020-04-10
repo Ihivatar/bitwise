@@ -1,3 +1,12 @@
+@foreign
+func sqrtf(f: float): float { return 0; }
+
+@foreign
+func cosf(f: float): float { return 0; }
+
+@foreign
+func sinf(f: float): float { return 0; }
+
 struct vec2 {
     x, y: float;
 }
@@ -27,7 +36,7 @@ func dot2(a: vec2, b: vec2): float {
 }
 
 func len2(a: vec2): float {
-    return sqrt(dot2(a, a));
+    return sqrtf(dot2(a, a));
 }
 
 func unit2(a: vec2): vec2 {
@@ -43,7 +52,16 @@ func dir2(a: vec2, b: vec2): vec2 {
 }
 
 func rot2(a: float, b: vec2): vec2 {
-    c := cos(a);
-    s := sin(a);
+    c := cosf(a);
+    s := sinf(a);
     return {c*b.x - s*b.y, s*b.x + c*b.y};
+}
+
+func main(argc: int, argv: char**): int
+{
+    v := vec2{1, 0};
+    w := vec2{0, 1};
+    v = rot2(3.14/4, v);
+    w = add2(w, {0.1, 0.2});
+    return 0;
 }

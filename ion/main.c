@@ -14,6 +14,7 @@
 
 #include "common.c"
 #include "lex.c"
+#include "type.c"
 #include "ast.h"
 #include "ast.c"    
 #include "print.c"
@@ -21,6 +22,7 @@
 #include "resolve.c"
 #include "gen.c"
 #include "ion.c"
+#include "test.c"
 
 void main_test(void) {
     common_test();

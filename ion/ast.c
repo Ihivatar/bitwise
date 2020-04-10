@@ -41,25 +41,32 @@ Typespec *typespec_name(SrcPos pos, const char *name) {
 
 }
 
-Typespec *typespec_ptr(SrcPos pos, Typespec *elem) {
+Typespec *typespec_ptr(SrcPos pos, Typespec *base) {
     Typespec *t = typespec_new(TYPESPEC_PTR, pos);
-    t->ptr.elem = elem;
+    t->base = base;
+    return t;
+}
+
+Typespec* typespec_const(SrcPos pos, Typespec* base)
+{
+    Typespec* t = typespec_new(TYPESPEC_CONST, pos);
+    t->base = base;
     return t;
 }
 
 Typespec *typespec_array(SrcPos pos, Typespec *elem, Expr *size) {
     Typespec *t = typespec_new(TYPESPEC_ARRAY, pos);
-    t->array.elem = elem;
-    t->array.size = size;
+    t->base = elem;
+    t->num_elems = size;
     return t;
 }
 
-Typespec *typespec_func(SrcPos pos, Typespec **args, size_t num_args, Typespec *ret, bool variadic) {
+Typespec *typespec_func(SrcPos pos, Typespec **args, size_t num_args, Typespec *ret, bool has_varargs) {
     Typespec *t = typespec_new(TYPESPEC_FUNC, pos);
     t->func.args = AST_DUP(args);
     t->func.num_args = num_args;
     t->func.ret = ret;
-    t->func.variadic = variadic;
+    t->func.has_varargs = has_varargs;
     return t;
 }
 
@@ -125,12 +132,12 @@ Decl *decl_var(SrcPos pos, const char *name, Typespec *type, Expr *expr) {
     return d;
 }
 
-Decl *decl_func(SrcPos pos, const char *name, FuncParam *params, size_t num_params, Typespec *ret_type, bool variadic, StmtList block) {
+Decl *decl_func(SrcPos pos, const char *name, FuncParam *params, size_t num_params, Typespec *ret_type, bool has_varargs, StmtList block) {
     Decl *d = decl_new(DECL_FUNC, pos, name);
     d->func.params = AST_DUP(params);
     d->func.num_params = num_params;
     d->func.ret_type = ret_type;
-    d->func.variadic = variadic;
+    d->func.has_varargs = has_varargs;
     d->func.block = block;
     return d;
 }
@@ -166,21 +173,25 @@ Expr *expr_sizeof_type(SrcPos pos, Typespec *type) {
     return e;
 }
 
-Expr *expr_int(SrcPos pos, int int_val) {
+Expr *expr_int(SrcPos pos, unsigned long long val, TokenMod mod, TokenSuffix suffix) {
     Expr *e = expr_new(EXPR_INT, pos);
-    e->int_val = int_val;
+    e->int_lit.val = val;
+    e->int_lit.mod = mod;
+    e->int_lit.suffix = suffix;
     return e;
 }
 
-Expr *expr_float(SrcPos pos, double float_val) {
+Expr *expr_float(SrcPos pos, double val, TokenSuffix suffix) {
     Expr *e = expr_new(EXPR_FLOAT, pos);
-    e->float_val = float_val;
+    e->float_lit.val = val;
+    e->float_lit.suffix = suffix;
     return e;
 }
 
-Expr *expr_str(SrcPos pos, const char *str_val) {
+Expr *expr_str(SrcPos pos, const char *val, TokenMod mod) {
     Expr *e = expr_new(EXPR_STR, pos);
-    e->str_val = str_val;
+    e->str_lit.val = val;
+    e->str_lit.mod = mod;
     return e;
 }
 
@@ -332,9 +343,10 @@ Stmt *stmt_assign(SrcPos pos, TokenKind op, Expr *left, Expr *right) {
     return s;
 }
 
-Stmt *stmt_init(SrcPos pos, const char *name, Expr *expr) {
+Stmt *stmt_init(SrcPos pos, const char *name, Typespec* type, Expr *expr) {
     Stmt *s = stmt_new(STMT_INIT, pos);
     s->init.name = name;
+    s->init.type = type;
     s->init.expr = expr;
     return s;
 }
