@@ -1,329 +1,9 @@
-typedef enum TypeKind {
-    TYPE_NONE,
-    TYPE_INCOMPLETE,
-    TYPE_COMPLETING,
-    TYPE_VOID,
-    TYPE_CHAR,
-    TYPE_SCHAR,
-    TYPE_UCHAR,
-    TYPE_SHORT,
-    TYPE_USHORT,
-    TYPE_INT,
-    TYPE_UINT,
-    TYPE_LONG,
-    TYPE_ULONG,
-    TYPE_LLONG,
-    TYPE_ULLONG,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_PTR,
-    TYPE_FUNC,
-    TYPE_ARRAY,
-    TYPE_STRUCT,
-    TYPE_UNION,
-    TYPE_ENUM,
-    MAX_TYPE_KINDS,
-} TypeKind;
-
-typedef struct Type Type;
-typedef struct Sym Sym;
-
-typedef struct TypeField {
-    const char *name;
-    Type *type;
-    size_t offset;
-} TypeField;
-
-struct Type {
-    TypeKind kind;
-    size_t size;
-    size_t align;
-    Sym *sym;
-    union {
-        struct {
-            Type *elem;
-        } ptr;
-        struct {
-            Type *elem;
-            size_t size;
-        } array;
-        struct {
-            TypeField *fields;
-            size_t num_fields;
-        } aggregate;
-        struct {
-            Type **params;
-            size_t num_params;
-            bool variadic;
-            Type *ret;
-        } func;
-    };
-};
-
-void complete_type(Type *type);
-
-Type *type_alloc(TypeKind kind) {
-    Type *type = xcalloc(1, sizeof(Type));
-    type->kind = kind;
-    return type;
-}
-
-Type *type_void = &(Type){TYPE_VOID, 0};
-Type *type_char = &(Type){TYPE_CHAR, 1, 1};
-Type *type_uchar = &(Type){TYPE_UCHAR, 1, 1};
-Type *type_schar = &(Type){TYPE_SCHAR, 1, 1};
-Type *type_short = &(Type){TYPE_SHORT, 2, 2};
-Type *type_ushort = &(Type){TYPE_USHORT, 2, 2};
-Type *type_int = &(Type){TYPE_INT, 4, 4};
-Type *type_uint = &(Type){TYPE_UINT, 4, 4};
-Type *type_long = &(Type){TYPE_LONG, 4, 4}; // 4 on 64-bit windows, 8 on 64-bit linux, probably factor this out to the backend
-Type *type_ulong = &(Type){TYPE_ULONG, 4, 4};
-Type *type_llong = &(Type){TYPE_LLONG, 8, 8};
-Type *type_ullong = &(Type){TYPE_ULLONG, 8, 8};
-Type *type_float = &(Type){TYPE_FLOAT, 4, 4};
-Type *type_double = &(Type){TYPE_DOUBLE, 8, 8};
-
-#define type_usize type_ullong
-#define type_ssize type_llong
-
-const size_t PTR_SIZE = 8;
-const size_t PTR_ALIGN = 8;
-
-bool is_integer_type(Type *type) {
-    return TYPE_CHAR <= type->kind && type->kind <= TYPE_ULLONG;
-}
-
-bool is_floating_type(Type* type)
-{
-    return TYPE_FLOAT <= type->kind && type->kind <= TYPE_DOUBLE;
-}
-
-bool is_arithmetic_type(Type *type) {
-    return TYPE_CHAR && type->kind && type->kind <= TYPE_DOUBLE;
-}
-
-bool is_scalar_type(Type* type)
-{
-    return TYPE_CHAR <= type->kind && type->kind <= TYPE_FUNC;
-}
-
-bool is_signed_type(Type *type) {
-    switch (type->kind) {
-    // TODO: TYPE_CHAR signedness is platform independent, needs to factor into backend
-    case TYPE_SCHAR:
-    case TYPE_SHORT:
-    case TYPE_INT:
-    case TYPE_LONG:
-    case TYPE_LLONG:
-        return true;
-    default:
-        return false;
-    }
-}
-
-const char* type_names[MAX_TYPE_KINDS] =
-{
-    [TYPE_VOID] = "void",
-    [TYPE_CHAR] = "char",
-    [TYPE_SCHAR] = "schar",
-    [TYPE_UCHAR] = "uchar",
-    [TYPE_SHORT] = "short",
-    [TYPE_USHORT] = "ushort",
-    [TYPE_INT] = "int",
-    [TYPE_UINT] = "uint",
-    [TYPE_LONG] = "long",
-    [TYPE_ULONG] = "ulong",
-    [TYPE_LLONG] = "llong",
-    [TYPE_ULLONG] = "ullong",
-    [TYPE_FLOAT] = "float",
-    [TYPE_DOUBLE] = "double"
-};
-
-int type_ranks[MAX_TYPE_KINDS] = {
-    [TYPE_CHAR] = 1,
-    [TYPE_SCHAR] = 1,
-    [TYPE_UCHAR] = 1,
-    [TYPE_SHORT] = 2,
-    [TYPE_USHORT] = 2,
-    [TYPE_INT] = 3,
-    [TYPE_UINT] = 3,
-    [TYPE_LONG] = 4,
-    [TYPE_ULONG] = 4,
-    [TYPE_LLONG] = 5,
-    [TYPE_ULLONG] = 5,
-};
-
-int type_rank(Type *type)
-{
-    int rank = type_ranks[type->kind];
-    assert(rank != 0);
-    return rank;
-}
-
-Type *unsigned_type(Type *type) {
-    switch (type->kind) {
-    case TYPE_CHAR:
-    case TYPE_SCHAR:
-    case TYPE_UCHAR:
-        return type_uchar;
-    case TYPE_SHORT:
-    case TYPE_USHORT:
-        return type_ushort;
-    case TYPE_INT:
-    case TYPE_UINT:
-        return type_uint;
-    case TYPE_LONG:
-    case TYPE_ULONG:
-        return type_ulong;
-    case TYPE_LLONG:
-    case TYPE_ULLONG:
-        return type_ullong;;
-    default:
-        assert(0);
-        return NULL;
-    }
-}
-
-size_t type_sizeof(Type *type) {
-    assert(type->kind > TYPE_COMPLETING);
-    assert(type->size != 0);
-    return type->size;
-}
-
-size_t type_alignof(Type *type) {
-    assert(type->kind > TYPE_COMPLETING);
-    return type->align;
-}
-
-Map cached_ptr_types;
-
-Type *type_ptr(Type *elem) {
-    Type *type = map_get(&cached_ptr_types, elem);
-    if (!type) {
-        type = type_alloc(TYPE_PTR);
-        type->size = PTR_SIZE;
-        type->align = PTR_ALIGN;
-        type->ptr.elem = elem;
-        map_put(&cached_ptr_types, elem, type);
-    }
-    return type;
-}
-
-typedef struct CachedArrayType {
-    Type *elem;
-    size_t size;
-    Type *array;
-} CachedArrayType;
-
-CachedArrayType *cached_array_types;
-
-Type *type_array(Type *elem, size_t size) {
-    for (CachedArrayType *it = cached_array_types; it != buf_end(cached_array_types); it++) {
-        if (it->elem == elem && it->size == size) {
-            return it->array;
-        }
-    }
-    complete_type(elem);
-    Type *type = type_alloc(TYPE_ARRAY);
-    type->size = size * type_sizeof(elem);
-    type->align = type_alignof(elem);
-    type->array.elem = elem;
-    type->array.size = size;
-    buf_push(cached_array_types, (CachedArrayType){elem, size, type});
-    return type;
-}
-
-typedef struct CachedFuncType {
-    Type **params;
-    size_t num_params;
-    bool variadic;
-    Type *ret;
-    Type *func;
-} CachedFuncType;
-
-CachedFuncType *cached_func_types;
-
-Type *type_func(Type **params, size_t num_params, Type *ret, bool variadic) {
-    for (CachedFuncType *it = cached_func_types; it != buf_end(cached_func_types); it++) {
-        if (it->num_params == num_params && it->ret == ret && it->variadic == variadic) {
-            bool match = true;
-            for (size_t i = 0; i < num_params; i++) {
-                if (it->params[i] != params[i]) {
-                    match = false;
-                    break;
-                }
-            }
-            if (match) {
-                return it->func;
-            }
-        }
-    }
-    Type *type = type_alloc(TYPE_FUNC);
-    type->size = PTR_SIZE;
-    type->align = PTR_ALIGN;
-    type->func.params = memdup(params, num_params * sizeof(*params));
-    type->func.num_params = num_params;
-    type->func.variadic = variadic;
-    type->func.ret = ret;
-    buf_push(cached_func_types, (CachedFuncType){params, num_params, ret, type});
-    return type;
-}
-
-// TODO: This probably shouldn't use an O(n^2) algorithm
-bool duplicate_fields(TypeField *fields, size_t num_fields) {
-    for (size_t i = 0; i < num_fields; i++) {
-        for (size_t j = i+1; j < num_fields; j++) {
-            if (fields[i].name == fields[j].name) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-void type_complete_struct(Type *type, TypeField *fields, size_t num_fields) {
-    assert(type->kind == TYPE_COMPLETING);
-    type->kind = TYPE_STRUCT;
-    type->size = 0;
-    type->align = 0;
-    for (TypeField *it = fields; it != fields + num_fields; it++) {
-        assert(IS_POW2(type_alignof(it->type)));
-        it->offset = type->size;
-        type->size = type_sizeof(it->type) + ALIGN_UP(type->size, type_alignof(it->type));
-        type->align = MAX(type->align, type_alignof(it->type));
-    }
-    type->aggregate.fields = memdup(fields, num_fields * sizeof(*fields));
-    type->aggregate.num_fields = num_fields;
-}
-
-void type_complete_union(Type *type, TypeField *fields, size_t num_fields) {
-    assert(type->kind == TYPE_COMPLETING);
-    type->kind = TYPE_UNION;
-    type->size = 0;
-    type->align = 0;
-    for (TypeField *it = fields; it != fields + num_fields; it++) {
-        assert(it->type->kind > TYPE_COMPLETING);
-        it->offset = 0;
-        type->size = MAX(type->size, type_sizeof(it->type));
-        type->align = MAX(type->align, type_alignof(it->type));
-    }
-    type->aggregate.fields = memdup(fields, num_fields * sizeof(*fields));
-    type->aggregate.num_fields = num_fields;
-}
-
-Type *type_incomplete(Sym *sym) {
-    Type *type = type_alloc(TYPE_INCOMPLETE);
-    type->sym = sym;
-    return type;
-}
-
 typedef enum SymKind {
     SYM_NONE,
     SYM_VAR,
     SYM_CONST,
     SYM_FUNC,
     SYM_TYPE,
-    SYM_ENUM_CONST,
 } SymKind;
 
 typedef enum SymState {
@@ -331,22 +11,6 @@ typedef enum SymState {
     SYM_RESOLVING,
     SYM_RESOLVED,
 } SymState;
-
-typedef union Val {
-    char c;
-    unsigned char uc;
-    signed char sc;
-    short s;
-    unsigned short us;
-    int i;
-    unsigned u;
-    long l;
-    unsigned long ul;
-    long long ll;
-    unsigned long long ull;
-    float f;
-    double d;
-} Val;
 
 typedef struct Sym {
     const char *name;
@@ -361,6 +25,7 @@ enum {
     MAX_LOCAL_SYMS = 1024
 };
 
+Sym** sorted_syms;
 Map global_syms_map;
 Sym **global_syms_buf;
 Sym local_syms[MAX_LOCAL_SYMS];
@@ -404,21 +69,27 @@ Sym *sym_decl(Decl *decl) {
     return sym;
 }
 
-Sym *sym_enum_const(const char *name, Decl *decl) {
-    return sym_new(SYM_ENUM_CONST, name, decl);
-}
-
-Sym *sym_get(const char *name) {
+Sym *sym_get_local(const char *name) {
     for (Sym *it = local_syms_end; it != local_syms; it--) {
         Sym *sym = it-1;
         if (sym->name == name) {
             return sym;
         }
     }
-    return map_get(&global_syms_map, (void *)name);
+    return NULL;
 }
 
-void sym_push_var(const char *name, Type *type) {
+Sym* sym_get(const char* name)
+{
+    Sym* sym = sym_get_local(name);
+    return sym ? sym : map_get(&global_syms_map, (void*)name);
+}
+
+bool sym_push_var(const char *name, Type *type) {
+    if (sym_get_local(name))
+    {
+        return false;
+    }
     if (local_syms_end == local_syms + MAX_LOCAL_SYMS) {
         fatal("Too many local symbols");
     }
@@ -428,6 +99,7 @@ void sym_push_var(const char *name, Type *type) {
         .state = SYM_RESOLVED,
         .type = type,
     };
+    return true;
 }
 
 Sym *sym_enter(void) {
@@ -439,35 +111,68 @@ void sym_leave(Sym *sym) {
 }
 
 void sym_global_put(Sym *sym) {
+    if (map_get(&global_syms_map, (void*)sym->name))
+    {
+        SrcPos pos = sym->decl ? sym->decl->pos : pos_builtin;
+        fatal_error(pos, "Duplicate definiton of global symbol");
+    }
     map_put(&global_syms_map, (void *)sym->name, sym);
     buf_push(global_syms_buf, sym);
 }
 
-Sym *sym_global_decl(Decl *decl) {
-    Sym *sym = sym_decl(decl);
-    sym_global_put(sym);
-    decl->sym = sym;
-    if (decl->kind == DECL_ENUM) {
-        for (size_t i = 0; i < decl->enum_decl.num_items; i++) {
-            sym_global_put(sym_enum_const(decl->enum_decl.items[i].name, decl));
-        }
-    }
-    return sym;
-}
-
-void sym_global_type(const char *name, Type *type) {
-    Sym *sym = sym_new(SYM_TYPE, str_intern(name), NULL);
+void sym_global_type(const char* name, Type* type)
+{
+    Sym* sym = sym_new(SYM_TYPE, str_intern(name), NULL);
     sym->state = SYM_RESOLVED;
     sym->type = type;
+    sym_global_put(sym);
+}
+
+void sym_global_typedef(const char *name, Type *type) {
+    Sym *sym = sym_new(SYM_TYPE, str_intern(name), decl_typedef(pos_builtin, name, typespec_name(pos_builtin, name)));
+    sym->state = SYM_RESOLVED;
+    sym->type = type;
+    sym_global_put(sym);
+}
+
+void sym_global_const(const char* name, Type* type, Val val)
+{
+    Sym* sym = sym_new(SYM_CONST, str_intern(name), NULL);
+    sym->state = SYM_RESOLVED;
+    sym->type = type;
+    sym->val = val;
     sym_global_put(sym);
 }
 
 void sym_global_func(const char *name, Type *type) {
-    assert(type->kind = TYPE_FUNC);
+    assert(type->kind == TYPE_FUNC);
     Sym *sym = sym_new(SYM_FUNC, str_intern(name), NULL);
     sym->state = SYM_RESOLVED;
     sym->type = type;
     sym_global_put(sym);
+}
+
+Sym* sym_global_decl(Decl* decl)
+{
+    Sym* sym = sym_decl(decl);
+    sym_global_put(sym);
+    decl->sym = sym;
+    if (decl->kind == DECL_ENUM)
+    {
+        sym->state = SYM_RESOLVED;
+        sym->type = type_enum(sym);
+        buf_push(sorted_syms, sym);
+        for (int i = 0; i < decl->enum_decl.num_items; ++i)
+        {
+            EnumItem item = decl->enum_decl.items[i];
+            if (item.init)
+            {
+                fatal_error(item.pos, "Explicit enum constant initializers are not currently supported");
+            }
+            sym_global_const(item.name, sym->type, (Val){.i = i});
+        }
+    }
+    return sym;
 }
 
 typedef struct Operand {
@@ -481,7 +186,7 @@ Operand operand_null;
 
 Operand operand_rvalue(Type *type) {
     return (Operand){
-        .type = type,
+        .type = unqualify_type(type),
     };
 }
 
@@ -494,15 +199,31 @@ Operand operand_lvalue(Type *type) {
 
 Operand operand_const(Type *type, Val val) {
     return (Operand){
-        .type = type,
+        .type = unqualify_type(type),
         .is_const = true,
         .val = val,
     };
 }
 
+Operand operand_decay(Operand operand)
+{
+    operand.type = unqualify_type(operand.type);
+    if (operand.type->kind == TYPE_ARRAY)
+    {
+        operand.type = type_ptr(operand.type->base);
+    }
+    operand.is_lvalue = false;
+    return operand;
+}
+
+bool is_null_ptr(Operand operand);
+
 #define CASE(k, t) \
     case k: \
         switch (type->kind) { \
+        case TYPE_BOOL: \
+            operand->val.b = (bool)operand->val.t; \
+            break; \
         case TYPE_CHAR: \
             operand->val.c = (char)operand->val.t; \
             break; \
@@ -519,6 +240,7 @@ Operand operand_const(Type *type, Val val) {
             operand->val.us = (unsigned short)operand->val.t; \
             break; \
         case TYPE_INT: \
+        case TYPE_ENUM: \
             operand->val.i = (int)operand->val.t; \
             break; \
         case TYPE_UINT: \
@@ -536,11 +258,11 @@ Operand operand_const(Type *type, Val val) {
         case TYPE_ULLONG: \
             operand->val.ull = (unsigned long long)operand->val.t; \
             break; \
-        case TYPE_FLOAT: \
-            operand->val.f = (float)operand->val.t; \
+        case TYPE_PTR: \
+            operand->val.p = (uintptr_t)operand->val.t; \
             break; \
         case TYPE_DOUBLE: \
-            operand->val.d = (double)operand->val.t; \
+        case TYPE_DOUBLE: \
             break; \
         default: \
             operand->is_const = false; \
@@ -548,8 +270,10 @@ Operand operand_const(Type *type, Val val) {
         } \
         break;
 
-bool is_convertible(Type* dest, Type* src)
+bool is_convertible(Operand* operand, Type* dest)
 {
+    dest = unqualify_type(dest);
+    Type* src = unqualify_type(operand->type);
     if (dest == src)
     {
         return true;
@@ -558,9 +282,32 @@ bool is_convertible(Type* dest, Type* src)
     {
         return true;
     }
-    else if (dest->kind == TYPE_PTR && src->kind == TYPE_PTR)
+    else if (is_ptr_type(dest) && is_null_ptr(*operand))
     {
-        return dest->ptr.elem == type_void || src->ptr.elem == type_void;
+        return true;
+    }
+    else if (is_ptr_type(dest) && is_ptr_type(src))
+    {
+        if (is_const_type(dest->base) && is_const_type(src->base))
+        {
+            return dest->base->base == src->base->base || dest->base->base == type_void || src->base->base == type_void;
+        }
+        else
+        {
+            Type* unqual_dest_base = unqualify_type(dest->base);
+            if (unqual_dest_base == src->base)
+            {
+                return true;
+            }
+            else if (unqual_dest_base == type_void)
+            {
+                return is_const_type(dest->base) || !is_const_type(src->base);
+            }
+            else
+            {
+                return ptr->base == type_void;
+            }
+        }
     }
     else
     {
@@ -568,9 +315,8 @@ bool is_convertible(Type* dest, Type* src)
     }
 }
 
-bool convert_operand(Operand *operand, Type *type)
-{
-    if (operand->type == type)
+// TODO continue here day 17
+bool is_castable(Operand* operand, Type* dest)
     {
         return true;
     }

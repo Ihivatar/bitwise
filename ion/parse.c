@@ -4,30 +4,44 @@ Typespec *parse_type(void);
 Stmt *parse_stmt(void);
 Expr *parse_expr(void);
 
+Typespec* parse_type_func_param(void)
+{
+    Typespec* type = parse_type();
+    if (match_token(TOKEN_COLON))
+    {
+        if (type->kind != TYPESPEC_NAME)
+        {
+            error_here("Colons in parameters of func types must be preceded by names.");
+        }
+        type = parse_type();
+    }
+    return type;
+}
+
 Typespec *parse_type_func(void) {
     SrcPos pos = token.pos;
     Typespec **args = NULL;
-    bool variadic = false;
+    bool has_varargs = false;
     expect_token(TOKEN_LPAREN);
     if (!is_token(TOKEN_RPAREN)) {
-        buf_push(args, parse_type());
+        buf_push(args, parse_type_func_param());
         while (match_token(TOKEN_COMMA))
         {
             if (match_token(TOKEN_ELLIPSES))
             {
-                if (variadic)
+                if (has_varargs)
                 {
-                    syntax_error("Multiple ellipsis instances in function type");
+                    error_here("Multiple ellipsis instances in function type");
                 }
-                variadic = true;
+                has_varargs = true;
             }
             else
             {
-                if (variadic)
+                if (has_varargs)
                 {
-                    syntax_error("Ellipsis must be last parameter in function type");
+                    error_here("Ellipsis must be last parameter in function type");
                 }
-                buf_push(args, parse_type());
+                buf_push(args, parse_type_func_param());
             }
         }
     }
@@ -36,7 +50,7 @@ Typespec *parse_type_func(void) {
     if (match_token(TOKEN_COLON)) {
         ret = parse_type();
     }
-    return typespec_func(pos, args, buf_len(args), ret, variadic);
+    return typespec_func(pos, args, buf_len(args), ret, has_varargs);
 }
 
 Typespec *parse_type_base(void) {
@@ -52,7 +66,7 @@ Typespec *parse_type_base(void) {
         expect_token(TOKEN_RPAREN);
         return type;
     } else {
-        fatal_syntax_error("Unexpected token %s in type", token_info());
+        fatal_error_here("Unexpected token %s in type", token_info());
         return NULL;
     }
 }
@@ -60,7 +74,7 @@ Typespec *parse_type_base(void) {
 Typespec *parse_type(void) {
     Typespec *type = parse_type_base();
     SrcPos pos = token.pos;
-    while (is_token(TOKEN_LBRACKET) || is_token(TOKEN_MUL)) {
+    while (is_token(TOKEN_LBRACKET) || is_token(TOKEN_MUL) || is_keyword(const_keyword)) {
         if (match_token(TOKEN_LBRACKET)) {
             Expr *size = NULL;
             if (!is_token(TOKEN_RBRACKET)) {
@@ -68,6 +82,8 @@ Typespec *parse_type(void) {
             }
             expect_token(TOKEN_RBRACKET);
             type = typespec_array(pos, type, size);
+        } else if (match_keyword(const_keyword)) {
+            type = typespec_const(pos, type);
         } else {
             assert(is_token(TOKEN_MUL));
             next_token();
@@ -88,7 +104,7 @@ CompoundField parse_expr_compound_field(void) {
         Expr *expr = parse_expr();
         if (match_token(TOKEN_ASSIGN)) {
             if (expr->kind != EXPR_NAME) {
-                fatal_syntax_error("Named initializer in compound literal must be preceded by field name");
+                fatal_error_here("Named initializer in compound literal must be preceded by field name");
             }
             return (CompoundField){FIELD_NAME, pos, parse_expr(), .name = expr->name};
         } else {
@@ -116,17 +132,21 @@ Expr *parse_expr_unary(void);
 Expr *parse_expr_operand(void) {
     SrcPos pos = token.pos;
     if (is_token(TOKEN_INT)) {
-        int val = token.int_val;
+        unsigned long long val = token.int_val;
+        TokenMod mod = token.mod;
+        TokenSuffix suffix = token.suffix;
         next_token();
-        return expr_int(pos, val);
+        return expr_int(pos, val, mod, suffix);
     } else if (is_token(TOKEN_FLOAT)) {
         double val = token.float_val;
+        TokenSuffix suffix = token.suffix;
         next_token();
-        return expr_float(pos, val);
+        return expr_float(pos, val, suffix);
     } else if (is_token(TOKEN_STR)) {
         const char *val = token.str_val;
+        TokenMod mod = token.mod;
         next_token();
-        return expr_str(pos, val);
+        return expr_str(pos, val, mod);
     } else if (is_token(TOKEN_NAME)) {
         const char *name = token.name;
         next_token();
@@ -163,7 +183,7 @@ Expr *parse_expr_operand(void) {
             return expr;
         }
     } else {
-        fatal_syntax_error("Unexpected token %s in expression", token_info());
+        fatal_error_here("Unexpected token %s in expression", token_info());
         return NULL;
     }
 }
@@ -340,7 +360,7 @@ Stmt *parse_stmt_while(SrcPos pos) {
 Stmt *parse_stmt_do_while(SrcPos pos) {
     StmtList block = parse_stmt_block();
     if (!match_keyword(while_keyword)) {
-        fatal_syntax_error("Expected 'while' after 'do' block");
+        fatal_error_here("Expected 'while' after 'do' block");
         return NULL;
     }
     Stmt *stmt = stmt_do_while(pos, parse_paren_expr(), block);
@@ -353,24 +373,39 @@ bool is_assign_op(void) {
 }
 
 Stmt *parse_simple_stmt(void) {
+    SrcPos pos = token.pos;
     Expr *expr = parse_expr();
     Stmt *stmt;
     if (match_token(TOKEN_COLON_ASSIGN)) {
         if (expr->kind != EXPR_NAME) {
-            fatal_syntax_error(":= must be preceded by a name");
+            fatal_error_here(":= must be preceded by a name");
             return NULL;
         }
-        stmt = stmt_init(expr->pos, expr->name, parse_expr());
+        stmt = stmt_init(pos, expr->name, NULL, parse_expr());
+    } else if (match_token(TOKEN_COLON)) {
+        if (expr->kind != EXPR_NAME)
+        {
+            fatal_error_here(": must be preceded by a name");
+            return NULL;
+        }
+        const char* name = expr->name;
+        Typespec* type = parse_type();
+        Expr* expr = NULL;
+        if (match_token(TOKEN_ASSIGN))
+        {
+            expr = parse_expr();
+        }
+        stmt = stmt_init(pos, name, type, expr);
     } else if (is_assign_op()) {
         TokenKind op = token.kind;
         next_token();
-        stmt = stmt_assign(expr->pos, op, expr, parse_expr());
+        stmt = stmt_assign(pos, op, expr, parse_expr());
     } else if (is_token(TOKEN_INC) || is_token(TOKEN_DEC)) {
         TokenKind op = token.kind;
         next_token();
-        stmt = stmt_assign(expr->pos, op, expr, NULL);
+        stmt = stmt_assign(pos, op, expr, NULL);
     } else {
-        stmt = stmt_expr(expr->pos, expr);
+        stmt = stmt_expr(pos, expr);
     }
     return stmt;
 }
@@ -391,7 +426,7 @@ Stmt *parse_stmt_for(SrcPos pos) {
     if (!is_token(TOKEN_RPAREN)) {
         next = parse_simple_stmt();
         if (next->kind == STMT_INIT) {
-            syntax_error("Init statements not allowed in for-statement's next clause");
+            error_here("Init statements not allowed in for-statement's next clause");
         }
     }
     expect_token(TOKEN_RPAREN);
@@ -411,7 +446,7 @@ SwitchCase parse_stmt_switch_case(void) {
             assert(is_keyword(default_keyword));
             next_token();
             if (is_default) {
-                syntax_error("Duplicate default labels in same switch clause");
+                error_here("Duplicate default labels in same switch clause");
             }
             is_default = true;
         }
@@ -464,10 +499,6 @@ Stmt *parse_stmt(void) {
         expect_token(TOKEN_SEMICOLON);
         return stmt_return(pos, expr);
     } else {
-        Decl *decl = parse_decl_opt();
-        if (decl) {
-            return stmt_decl(pos, decl);
-        }
         Stmt *stmt = parse_simple_stmt();
         expect_token(TOKEN_SEMICOLON);
         return stmt;
@@ -532,16 +563,19 @@ Decl *parse_decl_aggregate(SrcPos pos, DeclKind kind) {
 Decl *parse_decl_var(SrcPos pos) {
     const char *name = parse_name();
     if (match_token(TOKEN_ASSIGN)) {
-        return decl_var(pos, name, NULL, parse_expr());
+        Expr* expr = parse_expr();
+        expect_token(TOKEN_SEMICOLON);
+        return decl_var(pos, name, NULL, expr);
     } else if (match_token(TOKEN_COLON)) {
         Typespec *type = parse_type();
         Expr *expr = NULL;
         if (match_token(TOKEN_ASSIGN)) {
             expr = parse_expr();
         }
+        expect_token(TOKEN_SEMICOLON);
         return decl_var(pos, name, type, expr);
     } else {
-        fatal_syntax_error("Expected : or = after var, got %s", token_info());
+        fatal_error_here("Expected : or = after var, got %s", token_info());
         return NULL;
     }
 }
@@ -549,13 +583,17 @@ Decl *parse_decl_var(SrcPos pos) {
 Decl *parse_decl_const(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_ASSIGN);
-    return decl_const(pos, name, parse_expr());
+    Expr* expr = parse_expr();
+    expect_token(TOKEN_SEMICOLON);
+    return decl_const(pos, name, expr);
 }
 
 Decl *parse_decl_typedef(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_ASSIGN);
-    return decl_typedef(pos, name, parse_type());
+    Typespec* type = parse_type();
+    expect_token(TOKEN_SEMICOLON);
+    return decl_typedef(pos, name, type);
 }
 
 FuncParam parse_decl_func_param(void) {
@@ -570,24 +608,24 @@ Decl *parse_decl_func(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_LPAREN);
     FuncParam *params = NULL;
-    bool variadic = false;
+    bool has_varargs = false;
     if (!is_token(TOKEN_RPAREN)) {
         buf_push(params, parse_decl_func_param());
         while (match_token(TOKEN_COMMA))
         {
             if (match_token(TOKEN_ELLIPSES))
             {
-                if (variadic)
+                if (has_varargs)
                 {
-                    syntax_error("Multiple ellipsis in function declaration");
+                    error_here("Multiple ellipsis in function declaration");
                 }
-                variadic = true;
+                has_varargs = true;
             }
             else
             {
-                if (variadic)
+                if (has_varargs)
                 {
-                    syntax_error("Ellipsis must be last parameter in function declaration");
+                    error_here("Ellipsis must be last parameter in function declaration");
                 }
                 buf_push(params, parse_decl_func_param());
             }
@@ -599,7 +637,7 @@ Decl *parse_decl_func(SrcPos pos) {
         ret_type = parse_type();
     }
     StmtList block = parse_stmt_block();
-    return decl_func(pos, name, params, buf_len(params), ret_type, variadic, block);
+    return decl_func(pos, name, params, buf_len(params), ret_type, has_varargs, block);
 }
 
 NoteList parse_note_list(void)
@@ -620,14 +658,14 @@ Decl *parse_decl_opt(void) {
         return parse_decl_aggregate(pos, DECL_STRUCT);
     } else if (match_keyword(union_keyword)) {
         return parse_decl_aggregate(pos, DECL_UNION);
-    } else if (match_keyword(var_keyword)) {
-        return parse_decl_var(pos);
     } else if (match_keyword(const_keyword)) {
         return parse_decl_const(pos);
     } else if (match_keyword(typedef_keyword)) {
         return parse_decl_typedef(pos);
     } else if (match_keyword(func_keyword)) {
         return parse_decl_func(pos);
+    } else if (match_keyword(var_keyword)) {
+        return parse_decl_var(pos);
     } else {
         return NULL;
     }
@@ -637,7 +675,7 @@ Decl *parse_decl(void) {
     NoteList notes = parse_note_list();
     Decl *decl = parse_decl_opt();
     if (!decl) {
-        fatal_syntax_error("Expected declaration keyword, got %s", token_info());
+        fatal_error_here("Expected declaration keyword, got %s", token_info());
     }
     decl->notes = notes;
     return decl;
@@ -651,34 +689,4 @@ DeclSet *parse_file(void) {
         buf_push(decls, decl);
     }
     return decl_set(decls, buf_len(decls));
-}
-
-void parse_test(void) {
-    const char *decls[] = {
-        "var x: char[256] = {1, 2, 3, ['a'] = 4}",
-        "struct Vector { x, y: float; }",
-        "var v = Vector{x = 1.0, y = -1.0}",
-        "var v: Vector = {1.0, -1.0}",
-        "const n = sizeof(:int*[16])",
-        "const n = sizeof(1+2)",
-        "var x = b == 1 ? 1+2 : 3-4",
-        "func fact(n: int): int { trace(\"fact\"); if (n == 0) { return 1; } else { return n * fact(n-1); } }",
-        "func fact(n: int): int { p := 1; for (i := 1; i <= n; i++) { p *= i; } return p; }",
-        "var foo = a ? a&b + c<<d + e*f == +u-v-w + *g/h(x,y) + -i%k[x] && m <= n*(p+q)/r : 0",
-        "func f(x: int): bool { switch (x) { case 0: case 1: return true; case 2: default: return false; } }",
-        "enum Color { RED = 3, GREEN, BLUE = 0 }",
-        "const pi = 3.14",
-        "union IntOrFloat { i: int; f: float; }",
-        "typedef Vectors = Vector[1+2]",
-        "func f() { do { print(42); } while(1); }",
-        "typedef T = (func(int):int)[16]",
-        "func f() { enum E { A, B, C } return; }",
-        "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
-    };
-    for (const char **it = decls; it != decls + sizeof(decls)/sizeof(*decls); it++) {
-        init_stream(NULL, *it);
-        Decl *decl = parse_decl();
-        print_decl(decl);
-        printf("\n");
-    }
 }
