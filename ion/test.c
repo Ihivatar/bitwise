@@ -1,5 +1,4 @@
-void intern_test(void)
-{
+void intern_test(void) {
     char a[] = "hello";
     assert(strcmp(a, str_intern(a)) == 0);
     assert(str_intern(a) == str_intern(a));
@@ -13,27 +12,24 @@ void intern_test(void)
     assert(str_intern(a) != str_intern(d));
 }
 
-void common_test(void)
-{
+void common_test(void) {
     buf_test();
     intern_test();
     map_test();
 
-    char* str1 = strf("%d %d", 1, 2);
+    char *str1 = strf("%d %d", 1, 2);
     assert(strcmp(str1, "1 2") == 0);
-    char* str2 = strf("%s %s", str1, str1);
+    char *str2 = strf("%s %s", str1, str1);
     assert(strcmp(str2, "1 2 1 2") == 0);
-    char* str3 = strf("%s asdf %s", str2, str2);
+    char *str3 = strf("%s asdf %s", str2, str2);
     assert(strcmp(str3, "1 2 1 2 asdf 1 2 1 2") == 0);
 }
 
-void keyword_test(void)
-{
+void keyword_test(void) {
     init_keywords();
     assert(is_keyword_name(first_keyword));
     assert(is_keyword_name(last_keyword));
-    for (const char** it = keywords; it != buf_end(keywords); ++it)
-    {
+    for (const char **it = keywords; it != buf_end(keywords); it++) {
         assert(is_keyword_name(*it));
     }
     assert(!is_keyword_name(str_intern("foo")));
@@ -46,8 +42,7 @@ void keyword_test(void)
 #define assert_token_str(x) assert(strcmp(token.str_val, (x)) == 0 && match_token(TOKEN_STR))
 #define assert_token_eof() assert(is_token(0))
 
-void lex_test(void)
-{
+void lex_test(void) {
     keyword_test();
     assert(str_intern("func") == func_keyword);
 
@@ -118,10 +113,8 @@ void lex_test(void)
 #undef assert_token_str
 #undef assert_token_eof
 
-void parse_test(void)
-{
-    const char* decls[] =
-    {
+void parse_test(void) {
+    const char *decls[] = {
         "var x: char[256] = {1, 2, 3, ['a'] = 4}",
         "struct Vector { x, y: float; }",
         "var v = Vector{x = 1.0, y = -1.0}",
@@ -141,19 +134,16 @@ void parse_test(void)
         "typedef T = (func(int):int)[16]",
         "func f() { enum E { A, B, C } return; }",
         "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
-    };
-
-    for (const char** it = decls; it != decls + sizeof(decls)/sizeof(*decls); ++it)
-    {
+};
+    for (const char **it = decls; it != decls + sizeof(decls)/sizeof(*decls); it++) {
         init_stream(NULL, *it);
-        Decl* decl = parse_decl();
+        Decl *decl = parse_decl();
         print_decl(decl);
         printf("\n");
     }
 }
 
-void gen_cdecl_test(void)
-{
+void gen_cdecl_test(void) {
 #if 0
     char *cdecl1 = type_to_cdecl(type_int, "x");
     char *cdecl2 = type_to_cdecl(type_ptr(type_int), "x");
@@ -168,8 +158,7 @@ void gen_cdecl_test(void)
 #endif
 }
 
-void resolve_test(void)
-{
+void resolve_test(void) {
     Type *int_ptr = type_ptr(type_int);
     assert(type_ptr(type_int) == int_ptr);
     Type *float_ptr = type_ptr(type_float);
@@ -277,8 +266,7 @@ void resolve_test(void)
     }
 }
 
-void main_test(void)
-{
+void main_test(void) {
     common_test();
     // lex_test();
     // print_test();

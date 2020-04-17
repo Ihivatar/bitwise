@@ -18,8 +18,7 @@ void *ast_dup(const void *src, size_t size) {
 
 #define AST_DUP(x) ast_dup(x, num_##x * sizeof(*x))
 
-NoteList note_list(Note* notes, size_t num_notes)
-{
+NoteList note_list(Note *notes, size_t num_notes) {
     return (NoteList){AST_DUP(notes), num_notes};
 }
 
@@ -47,9 +46,8 @@ Typespec *typespec_ptr(SrcPos pos, Typespec *base) {
     return t;
 }
 
-Typespec* typespec_const(SrcPos pos, Typespec* base)
-{
-    Typespec* t = typespec_new(TYPESPEC_CONST, pos);
+Typespec *typespec_const(SrcPos pos, Typespec *base) {
+    Typespec *t = typespec_new(TYPESPEC_CONST, pos);
     t->base = base;
     return t;
 }
@@ -85,21 +83,17 @@ Decl *decl_new(DeclKind kind, SrcPos pos, const char *name) {
     return d;
 }
 
-Note* get_decl_note(Decl* decl, const char* name)
-{
-    for (size_t i = 0; i < decl->notes.num_notes; ++i)
-    {
-        Note* note = decl->notes.notes + i;
-        if (note->name == name)
-        {
+Note *get_decl_note(Decl *decl, const char *name) {
+    for (size_t i = 0; i < decl->notes.num_notes; i++) {
+        Note *note = decl->notes.notes + i;
+        if (note->name == name) {
             return note;
         }
     }
     return NULL;
 }
 
-bool is_decl_foreign(Decl* decl)
-{
+bool is_decl_foreign(Decl *decl) {
     return get_decl_note(decl, foreign_name) != NULL;
 }
 
@@ -343,7 +337,7 @@ Stmt *stmt_assign(SrcPos pos, TokenKind op, Expr *left, Expr *right) {
     return s;
 }
 
-Stmt *stmt_init(SrcPos pos, const char *name, Typespec* type, Expr *expr) {
+Stmt *stmt_init(SrcPos pos, const char *name, Typespec *type, Expr *expr) {
     Stmt *s = stmt_new(STMT_INIT, pos);
     s->init.name = name;
     s->init.type = type;

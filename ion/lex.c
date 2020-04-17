@@ -22,7 +22,7 @@ const char *first_keyword;
 const char *last_keyword;
 const char **keywords;
 
-const char* foreign_name;
+const char *foreign_name;
 
 #define KEYWORD(name) name##_keyword = str_intern(#name); buf_push(keywords, name##_keyword)
 
@@ -78,7 +78,7 @@ typedef enum TokenKind {
     TOKEN_COMMA,
     TOKEN_DOT,
     TOKEN_AT,
-    TOKEN_ELLIPSES,
+    TOKEN_ELLIPSIS,
     TOKEN_QUESTION,
     TOKEN_SEMICOLON,
     TOKEN_KEYWORD,
@@ -135,8 +135,7 @@ typedef enum TokenKind {
     NUM_TOKEN_KINDS,
 } TokenKind;
 
-typedef enum TokenMod
-{
+typedef enum TokenMod {
     MOD_NONE,
     MOD_HEX,
     MOD_BIN,
@@ -145,8 +144,7 @@ typedef enum TokenMod
     MOD_MULTILINE,
 } TokenMod;
 
-typedef enum TokenSuffix
-{
+typedef enum TokenSuffix {
     SUFFIX_NONE,
     SUFFIX_D,
     SUFFIX_U,
@@ -156,8 +154,7 @@ typedef enum TokenSuffix
     SUFFIX_ULL,
 } TokenSuffix;
 
-const char* token_suffx_names[] =
-{
+const char *token_suffix_names[] = {
     [SUFFIX_NONE] = "",
     [SUFFIX_D] = "d",
     [SUFFIX_U] = "u",
@@ -179,7 +176,7 @@ const char *token_kind_names[] = {
     [TOKEN_COMMA] = ",",
     [TOKEN_DOT] = ".",
     [TOKEN_AT] = "@",
-    [TOKEN_ELLIPSES] = "...",
+    [TOKEN_ELLIPSIS] = "...",
     [TOKEN_QUESTION] = "?",
     [TOKEN_SEMICOLON] = ";",
     [TOKEN_KEYWORD] = "keyword",
@@ -231,8 +228,7 @@ const char *token_kind_name(TokenKind kind) {
     }
 }
 
-TokenKind assign_token_to_binary_token[NUM_TOKEN_KINDS] =
-{
+TokenKind assign_token_to_binary_token[NUM_TOKEN_KINDS] = {
     [TOKEN_ADD_ASSIGN] = TOKEN_ADD,
     [TOKEN_SUB_ASSIGN] = TOKEN_SUB,
     [TOKEN_OR_ASSIGN] = TOKEN_OR,
@@ -272,8 +268,7 @@ const char *stream;
 const char *line_start;
 
 void error(SrcPos pos, const char *fmt, ...) {
-    if (pos.name == NULL)
-    {
+    if (pos.name == NULL) {
         pos = pos_builtin;
     }
     va_list args;
@@ -339,7 +334,7 @@ void scan_int(void) {
             break;
         }
         if (digit >= base) {
-            error_here("Digit '%c' out of range for base %d" *stream, base);
+            error_here("Digit '%c' out of range for base %d", *stream, base);
             digit = 0;
         }
         if (val > (ULLONG_MAX - digit)/base) {
@@ -355,29 +350,23 @@ void scan_int(void) {
     }
     token.kind = TOKEN_INT;
     token.int_val = val;
-    if (tolower(*stream) == 'u')
-    {
+    if (tolower(*stream) == 'u') {
         token.suffix = SUFFIX_U;
-        ++stream;
-        if (tolower(*stream) == 'l')
-        {
+        stream++;
+        if (tolower(*stream) == 'l') {
             token.suffix = SUFFIX_UL;
-            ++stream;
-            if (tolower(*stream) == 'l')
-            {
+            stream++;
+            if (tolower(*stream) == 'l') {
                 token.suffix = SUFFIX_ULL;
-                ++stream;
+                stream++;
             }
         }
-    }
-    else if (tolower(*stream) == 'l')
-    {
+    } else if (tolower(*stream) == 'l') {
         token.suffix = SUFFIX_L;
-        ++stream;
-        if (tolower(*stream) == 'l')
-        {
+        stream++;
+        if (tolower(*stream) == 'l') {
             token.suffix = SUFFIX_LL;
-            ++stream;
+            stream++;
         }
     }
 }
@@ -411,10 +400,9 @@ void scan_float(void) {
     }
     token.kind = TOKEN_FLOAT;
     token.float_val = val;
-    if (tolower(*stream) == 'd')
-    {
+    if (tolower(*stream) == 'd') {
         token.suffix = SUFFIX_D;
-        ++stream;
+        stream++;
     }
 }
 
@@ -462,60 +450,46 @@ void scan_str(void) {
     assert(*stream == '"');
     stream++;
     char *str = NULL;
-    if (stream[0] == '"' && stream[1] == '"')
-    {
+    if (stream[0] == '"' && stream[1] == '"') {
         stream += 2;
-        while (*stream)
-        {
-            if (stream[0] == '"' && strean[1] == '"' && stream[2] == '"')
-            {
+        while (*stream) {
+            if (stream[0] == '"' && stream[1] == '"' && stream[2] == '"') {
                 stream += 3;
                 break;
             }
-            if (*stream != '\r')
-            {
-                // TODO(nicholas): Should probably just read files in text mode instead.
+            if (*stream != '\r') {
+                // TODO: Should probably just read files in text mode instead.
                 buf_push(str, *stream);
             }
-            if (*stream == '\n')
-            {
+            if (*stream == '\n') {
                 token.pos.line++;
             }
-            ++stream;
+            stream++;
         }
-        if (!*stream)
-        {
-            error_here("Unexpected end of file withing multi-line string literal");
+        if (!*stream) {
+            error_here("Unexpected end of file within multi-line string literal");
         }
         token.mod = MOD_MULTILINE;
     } else {
-        while (*stream && *stream !+ '"')
-        {
+        while (*stream && *stream != '"') {
             char val = *stream;
-            if (val == '\n')
-            {
+            if (val == '\n') {
                 error_here("String literal cannot contain newline");
                 break;
-            }
-            else if (val == '\\')
-            {
-                ++stream;
+            } else if (val == '\\') {
+                stream++;
                 val = escape_to_char[(unsigned char)*stream];
-                if (val == 0 && *stream != '0')
-                {
+                if (val == 0 && *stream != '0') {
                     error_here("Invalid string literal escape '\\%c'", *stream);
                 }
             }
             buf_push(str, val);
-            ++stream;
+            stream++;
         }
-        if (*stream)
-        {
+        if (*stream) {
             assert(*stream == '"');
-            ++stream;
-        }
-        else
-        {
+            stream++;
+        } else {
             error_here("Unexpected end of file within string literal");
         }
     }
@@ -576,10 +550,8 @@ repeat:
     case '.':
         if (isdigit(stream[1])) {
             scan_float();
-        }
-        else if (stream[1] == '.' && stream[2] == '.')
-        {
-            token.kind = TOKEN_ELLIPSES;
+        } else if (stream[1] == '.' && stream[2] == '.') {
+            token.kind = TOKEN_ELLIPSIS;
             stream += 3;
         } else {
             token.kind = TOKEN_DOT;

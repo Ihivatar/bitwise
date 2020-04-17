@@ -1,3 +1,134 @@
+# Bitwise, Day 17: Ion Version 0
+- Video: https://www.youtube.com/watch?v=Oeqeqw4OHPE
+- Extra: https://www.youtube.com/watch?v=DoPG4OCnh7A
+- Plan for this week
+- Review
+- Homework
+- Start work on Ion library/application
+
+Homework: Choose-Your-Own-Adventure Compiler Hacking
+
+Implement as many of the following features as you like in the Ion compiler (either the official Ion compiler or your own version). Make sure to reuse the existing functionality as much as possible. Each feature should take no more than ~50 lines of code to implement. If you run out of stuff to do, you can play around with adding other lightweight language extensions with a similar level of implementation complexity. 
+
+    if (file := fopen("foo.txt", "r")) {
+        // ...
+    }
+    =>
+    {
+        FILE *file = fopen("foo.txt", "r");
+        if (file) {
+            // ...
+        }
+    }
+
+    if (n := fread(...); n != size) {
+        // ...
+    }
+    =>
+    {
+        size_t n = fread(...);
+        if (n != size) {
+            // ...
+        }        
+    }
+
+    while (x := init(); !done(x)) {
+        // ...
+    }
+    =>
+    {
+        X x = init();
+        while (!done(x)) {
+            // ...
+        }
+    }
+
+Extra credit:
+
+Here is a more complicated feature you can try to implement if you want more of a challenge.
+
+Defer:
+- Defer statements have stack-order deferred execution.
+- Type checked/resolved at definition site.
+- Disallow returns, breaks, continues, defers in defer bodies, inits must be in blocks.
+
+The easiest implementation of the code generation is to have a Stmt* stack of deferred statements.
+You need to maintain pointers into the stack to track the top of the stack, the innermost enclosing
+block and the innermost enclosing loop so you can determine what range of deferred statements to
+generate when exiting scopes either normally or via return, break and continue.
+
+For the sanity checking of defer bodies, you can add a bool deferred parameter to the resolve_stmt
+family of functions so the different cases can check whether they're legal in the context of
+a defer body. So STMT_BREAK, STMT_CONTINUE, STMT_RETURN, STMT_DEFER would be illegal if deferred
+is set to true. Most statements just propagate the deferred flag down to the recursive calls,
+except STMT_DEFER, which will pass true.
+
+Example:
+
+    window := create_window();
+    defer destroy_window(window);
+    while (...) {
+        file := fopen("foo.txt", "r");
+        defer fclose(file);
+        if (...) {
+            return 0;
+        }
+        if (...) {
+            continue;
+        }
+        if (...) {
+            mem := malloc(get_file_size(file));
+            defer free(mem);
+            if (...) {
+                break;
+            }
+        }
+    }
+    return 0;
+    =>
+    Window *window = create_window();
+    while (...) {
+        FILE *file = fopen("foo.txt", "r");
+        if (...) {
+            fclose(file);
+            destroy_window(window);
+            return 0;
+        }
+        if (...) {
+            fclose(file);
+            continue;
+        }
+        if (...) {
+            void *mem = malloc(get_file_size(file));
+            if (...) {
+                free(mem);
+                fclose(file);
+                break;
+            }
+            free(mem);
+        }
+        fclose(file);
+    }
+    destroy_window(window);
+    return 0;
+
+# Bitwise, Day 16: Weekend Edition
+- Video: https://www.youtube.com/watch?v=jNbar0lj93g
+- Review
+- Random stuff
+
+# Bitwise, Day 15: More Compiler Hacking
+- Video: https://www.youtube.com/watch?v=s5_RV3y4L18
+- Review diffs
+- Continue coding
+
+# Day 14: Types Revisited
+- Video: https://www.youtube.com/watch?v=Dq2gKTdL1uI
+- Extra: https://www.youtube.com/watch?v=amSiLEFcjq4
+- More homework coming soon
+- Review diffs
+- Start filling in the rest of the type system
+
 # Day 13: More Code Generation
 - Video, Part 1: https://www.youtube.com/watch?v=uIjd094EKPM
 - Video, Part 2: https://www.youtube.com/watch?v=PVnRVadB7g0

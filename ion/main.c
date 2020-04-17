@@ -24,16 +24,7 @@
 #include "ion.c"
 #include "test.c"
 
-void main_test(void) {
-    common_test();
-    // lex_test();
-    // print_test();
-    // parse_test();
-    resolve_test();
-    // ion_test();
-}
-
-int main(int argc, char **argv) {  
-//    main_test();
+int main(int argc, char **argv) {
+ //    main_test();
     return ion_main(argc, argv);
 }

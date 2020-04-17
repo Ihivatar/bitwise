@@ -369,8 +369,7 @@ const char *str_intern(const char *str) {
 
 // Value union
 
-typedef union Val
-{
+typedef union Val {
     bool b;
     char c;
     unsigned char uc;
@@ -385,3 +384,5 @@ typedef union Val
     unsigned long long ull;
     uintptr_t p;
 } Val;
+
+

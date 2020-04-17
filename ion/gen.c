@@ -38,8 +38,7 @@ void genln(void) {
     gen_pos.line++;
 }
 
-bool is_incomplete_array_typespec(Typespec* typespec)
-{
+bool is_incomplete_array_typespec(Typespec *typespec) {
     return typespec->kind == TYPESPEC_ARRAY && !typespec->num_elems;
 }
 
@@ -56,27 +55,19 @@ char char_to_escape[256] = {
     ['\''] = '\'',
 };
 
-void gen_char(char c)
-{
-    if (char_to_escape[(unsigned char)c])
-    {
+void gen_char(char c) {
+    if (char_to_escape[(unsigned char)c]) {
         genf("'\\%c'", char_to_escape[(unsigned char)c]);
-    }
-    else if (isprint(c))
-    {
+    } else if (isprint(c)) {
         genf("'%c'", c);
-    }
-    else
-    {
+    } else {
         genf("'\\x%x'", c);
     }
 }
 
-void gen_str(const char* str, bool multiline)
-{
-    if (multiline)
-    {
-        ++gen_indent;
+void gen_str(const char *str, bool multiline) {
+    if (multiline) {
+        gen_indent++;
         genln();
     }
     genf("\"");
@@ -88,29 +79,23 @@ void gen_str(const char* str, bool multiline)
         if (start != str) {
             genf("%.*s", str - start, start);
         }
-        if (*str)
-        {
-            if (char_to_escape[(unsigned char)*str])
-            {
+        if (*str) {
+            if (char_to_escape[(unsigned char)*str]) {
                 genf("\\%c", char_to_escape[(unsigned char)*str]);
-                if (str[0] == '\n' && str[1])
-                {
+                if (str[0] == '\n' && str[1]) {
                     genf("\"");
                     genlnf("\"");
                 }
-            }
-            else
-            {
+            } else {
                 assert(!isprint(*str));
                 genf("\\x%x", *str);
             }
-            ++str;
+            str++;
         }
     }
     genf("\"");
-    if (multiline)
-    {
-        --gen_indent;
+    if (multiline) {
+        gen_indent--;
     }
 }
 
@@ -129,15 +114,11 @@ const char *cdecl_paren(const char *str, bool b) {
     return b ? strf("(%s)", str) : str;
 }
 
-const char *cdecl_name(Type *type)
-{
-    const char* type_name = type_names[type->kind];
-    if (type_name)
-    {
+const char *cdecl_name(Type *type) {
+    const char *type_name = type_names[type->kind];
+    if (type_name) {
         return type_name;
-    }
-    else
-    {
+    } else {
         assert(type->sym);
         return type->sym->name;
     }
@@ -150,12 +131,9 @@ char *type_to_cdecl(Type *type, const char *str) {
     case TYPE_CONST:
         return type_to_cdecl(type->base, strf("const %s", cdecl_paren(str, *str)));
     case TYPE_ARRAY:
-        if (type->num_elems == 0)
-        {
+        if (type->num_elems == 0) {
             return type_to_cdecl(type->base, cdecl_paren(strf("%s[]", str), *str));
-        }
-        else
-        {
+        } else {
             return type_to_cdecl(type->base, cdecl_paren(strf("%s[%llu]", str, type->num_elems), *str));
         }
     case TYPE_FUNC: {
@@ -168,8 +146,7 @@ char *type_to_cdecl(Type *type, const char *str) {
                 buf_printf(result, "%s%s", i == 0 ? "" : ", ", type_to_cdecl(type->func.params[i], ""));
             }
         }
-        if (type->func.has_varargs)
-        {
+        if (type->func.has_varargs) {
             buf_printf(result, ", ...");
         }
         buf_printf(result, ")");
@@ -201,12 +178,9 @@ char *typespec_to_cdecl(Typespec *typespec, const char *str) {
     case TYPESPEC_CONST:
         return typespec_to_cdecl(typespec->base, strf("const %s", cdecl_paren(str, *str)));
     case TYPESPEC_ARRAY:
-        if (typespec->num_elems == 0)
-        {
+        if (typespec->num_elems == 0) {
             return typespec_to_cdecl(typespec->base, cdecl_paren(strf("%s[]", str), *str));
-        }
-        else
-        {
+        } else {
             return typespec_to_cdecl(typespec->base, cdecl_paren(strf("%s[%s]", str, gen_expr_str(typespec->num_elems)), *str));
         }
     case TYPESPEC_FUNC: {
@@ -219,8 +193,7 @@ char *typespec_to_cdecl(Typespec *typespec, const char *str) {
                 buf_printf(result, "%s%s", i == 0 ? "" : ", ", typespec_to_cdecl(typespec->func.args[i], ""));
             }
         }
-        if (typespec->func.has_varargs)
-        {
+        if (typespec->func.has_varargs) {
             buf_printf(result, ", ...");
         }
         buf_printf(result, ")");
@@ -251,8 +224,7 @@ void gen_func_decl(Decl *decl) {
             genf("%s", typespec_to_cdecl(param.type, param.name));
         }
     }
-    if (decl->func.has_varargs)
-    {
+    if (decl->func.has_varargs) {
         genf(", ...");
     }
     genf(")");
@@ -265,8 +237,7 @@ void gen_forward_decls(void) {
         if (!decl) {
             continue;
         }
-        if (is_decl_foreign(decl))
-        {
+        if (is_decl_foreign(decl)) {
             continue;
         }
         switch (decl->kind) {
@@ -320,8 +291,7 @@ void gen_expr_compound(Expr *expr, bool is_init) {
         }
         gen_expr(field.init);
     }
-    if (expr->compound.num_fields == 0)
-    {
+    if (expr->compound.num_fields == 0) {
         genf("0");
     }
     genf("}");
@@ -329,33 +299,25 @@ void gen_expr_compound(Expr *expr, bool is_init) {
 
 void gen_expr(Expr *expr) {
     switch (expr->kind) {
-    case EXPR_INT:
-    {
-        const char* suffix_name = token_suffix_names[expr->int_lit.suffix];
-        switch (expr->int_lit.mod)
-        {
-            case MOD_BIN:
-            case MOD_HEX:
-            {
-                genf("0x%llx%s", expr->int_lit.val, suffix_name);
-            } break;
-
-            case MOD_OCT:
-            {
-                genf("0%llo%s", expr->int_lit.val, suffix_name);
-            } break;
-
-            case MOD_CHAR:
-            {
-                gen_char((char)expr->int_lit.val);
-            } break;
-
-            default:
-            {
-                genf("%llu%s", expr->int_lit.val, suffix_name);
-            } break;
+    case EXPR_INT: {
+        const char *suffix_name = token_suffix_names[expr->int_lit.suffix];
+        switch (expr->int_lit.mod) {
+        case MOD_BIN:
+        case MOD_HEX:
+            genf("0x%llx%s", expr->int_lit.val, suffix_name);
+            break;
+        case MOD_OCT:
+            genf("0%llo%s", expr->int_lit.val, suffix_name);
+            break;
+        case MOD_CHAR:
+            gen_char((char)expr->int_lit.val);
+            break;
+        default:
+            genf("%llu%s", expr->int_lit.val, suffix_name);
+            break;
         }
-    } break;
+        break;
+    }
     case EXPR_FLOAT:
         genf("%f%s", expr->float_lit.val, expr->float_lit.suffix == SUFFIX_D ? "" : "f");
         break;
@@ -456,29 +418,21 @@ void gen_simple_stmt(Stmt *stmt) {
         gen_expr(stmt->expr);
         break;
     case STMT_INIT:
-    {
-        if (stmt->init)
-        {
-            if (is_incomplete_array_typespec(stmt->init)
-            {
+        if (stmt->init.type) {
+            if (is_incomplete_array_typespec(stmt->init.type)) {
                 genf("%s", type_to_cdecl(stmt->init.expr->type, stmt->init.name));
-            }
-            else
-            {
+            } else {
                 genf("%s", typespec_to_cdecl(stmt->init.type, stmt->init.name));
             }
-            if (stmt->init.expr)
-            {
+            if (stmt->init.expr) {
                 genf(" = ");
                 gen_init_expr(stmt->init.expr);
             }
-        }
-        else
-        {
+        } else {
             genf("%s = ", type_to_cdecl(unqualify_type(stmt->init.expr->type), stmt->init.name));
             gen_init_expr(stmt->init.expr);
         }
-    }
+        break;
     case STMT_ASSIGN:
         gen_expr(stmt->assign.left);
         if (stmt->assign.right) {
@@ -598,16 +552,14 @@ void gen_stmt(Stmt *stmt) {
     }
 }
 
-void gen_enum(Decl* decl)
-{
+void gen_enum(Decl *decl) {
     assert(decl->kind == DECL_ENUM);
     genlnf("typedef enum %s {", decl->name);
-    ++gen_indent;
-    for (size_t i = 0; i < decl->enum_decl.num_items; ++i)
-    {
+    gen_indent++;
+    for (size_t i = 0; i < decl->enum_decl.num_items; i++) {
         genlnf("%s,", decl->enum_decl.items[i].name);
     }
-    --gen_indent;
+    gen_indent--;
     genlnf("} %s;", decl->name);
 }
 
@@ -666,8 +618,7 @@ void gen_func_defs(void) {
     for (Sym **it = global_syms_buf; it != buf_end(global_syms_buf); it++) {
         Sym *sym = *it;
         Decl *decl = sym->decl;
-        if (decl && decl->kind == DECL_FUNC && !is_decl_foreign(decl))
-        {
+        if (decl && decl->kind == DECL_FUNC && !is_decl_foreign(decl)) {
             gen_func_decl(decl);
             genf(" ");
             gen_stmt_block(decl->func.block);

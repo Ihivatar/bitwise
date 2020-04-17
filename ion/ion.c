@@ -31,7 +31,6 @@ const char *ion_compile_str(const char *str) {
     gen_buf = NULL;
     return result;
 }
-
 int ion_main(int argc, char **argv) {
     if (argc < 2) {
         printf("Usage: %s <ion-source-file>\n", argv[0]);

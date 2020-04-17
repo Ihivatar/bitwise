@@ -10,48 +10,42 @@ func getchar(): int { return 0; }
 const PI = 3.14;
 const PI2 = PI + PI;
 
-var c: char = 1
-var uc: uchar = 1
-var sc: schar = 1
+var c: char = 1;
+var uc: uchar = 1;
+var sc: schar = 1;
 
-const N = (:char)42 + 8 != 0
+const N = (:char)42 + 8 != 0;
 
-typedef A = int[1 + 2*sizeof(h())]
+typedef A = int[1 + 2*sizeof(h())];
 
 var code = """
 #include <stdio.h>
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
     printf("Hello, world!\n");
     return 0;
 }
 """;
 
-struct S1
-{
+struct S1 {
     a: int;
     b: int const;
 }
 
-struct S2
-{
+struct S2 {
     s1: S1;
 }
 
-func f10(a: int[3])
-{
+func f10(a: int[3]) {
     a[1] = 42;
 }
 
-func test_arrays()
-{
+func test_arrays() {
     a: int[] = {1, 2, 3};
     f10(a);
 }
 
-func test_nonmodifiable()
-{
+func test_nonmodifiable() {
     s1: S1;
     s1.a = 0;
     // s1.b = 0;
@@ -63,34 +57,29 @@ func test_nonmodifiable()
     // s2 = {};
 }
 
-struct UartCtrl
-{
+struct UartCtrl {
     tx_enable, rx_enable: bool;
 }
 
 const UART_CTRL = (:uint32*)0x12345678;
 
-func pack(ctrl: UartCtrl): uint32
-{
+func pack(ctrl: UartCtrl): uint32 {
     return (ctrl.tx_enable & 1) | ((ctrl.rx_enable & 1) << 1);
 }
 
-func unpack(word: uint32): UartCtrl
-{
-    return (tx_enable = word & 0b01, rx_enable = (word & 0b10) >> 1);
+func unpack(word: uint32): UartCtrl {
+    return {tx_enable = word & 0b01, rx_enable = (word & 0b10) >> 1};
 }
 
-func test_uart()
-{
-    tx_enable := unpack("UART_CTRL).tx_enable;
-    *UART_CTRL = pack((tx_enable = !tx_enable, rx_enable = false});
+func test_uart() {
+    tx_enable := unpack(*UART_CTRL).tx_enable;
+    *UART_CTRL = pack({tx_enable = !tx_enable, rx_enable = false});
     ctrl := unpack(*UART_CTRL);
     ctrl.rx_enable = true;
     *UART_CTRL = pack(ctrl);
 }
 
-func h(): uchar
-{
+func h(): uchar {
     Vector{x = 1, y = 2}.x = 42;
     v := &Vector{1, 2};
     v.x = 42;
@@ -104,24 +93,20 @@ func g(u: U): int {
     return u.i;
 }
 
-func k(vp: void*, ip: int*)
-{
+func k(vp: void*, ip: int*) {
     vp = ip;
     ip = vp;
 }
 
-func f1()
-{
+func f1() {
     p := &int{0};
     *p = 42;
 }
 
-func f3(a: int[])
-{
-
+func f3(a: int[]) {
 }
 
-typedef U = IntOrPtr
+typedef U = IntOrPtr;
 
 func example_test(): int {
     return fact_rec(10) == fact_iter(10);
@@ -142,14 +127,14 @@ var escape_to_char: char const[256] = {
     ['0'] = 0,
 };
 
-var a2: int[] = {1, 2, 3, [10] = 4};
+var a2: int[] = {1, 2, 3, [10]=4};
 // var a3: int[];
 
 func is_even(digit: int): int {
     b := 0;
     switch (digit) {
-        case 0, 2, 4, 6, 8:
-            b = 1;
+    case 0, 2, 4, 6, 8:
+        b = 1;
     }
     return b;
 }
@@ -167,8 +152,7 @@ struct Vector {
     x, y: int;
 }
 
-func f2(v: Vector)
-{
+func f2(v: Vector) {
     v = {};
 }
 
@@ -196,25 +180,22 @@ struct T {
     a: int[M];
 }
 
-enum Color
-{
+enum Color {
     COLOR_NONE,
     COLOR_RED,
     COLOR_GREEN,
     COLOR_BLUE,
-    NUM_COLORS
+    NUM_COLORS,
 }
 
-var color_names: char const*[NUM_COLORS] =
-{
+var color_names: char const*[NUM_COLORS] = {
     [COLOR_NONE] = "none",
     [COLOR_RED] = "red",
     [COLOR_GREEN] = "green",
-    [COLOR_BLUE] = "blue"
+    [COLOR_BLUE] = "blue",
 };
 
-func test_enum()
-{
+func test_enum() {
     a: Color = COLOR_RED;
     b := COLOR_RED;
     c := a + b;
@@ -223,11 +204,10 @@ func test_enum()
     printf("%d %d %d %d\n", COLOR_NONE, COLOR_RED, COLOR_GREEN, COLOR_BLUE);
 }
 
-func test_assign()
-{
+func test_assign() {
     i: int = 0;
     f: float = 3.14;
-    p: int* + &i;
+    p: int* = &i;
     i++;
     i--;
     p++;
@@ -243,6 +223,8 @@ func test_assign()
     i ^= 0x0ff0;
     // f++;
     // f--;
+
+    
 }
 
 func benchmark(n: int) {
@@ -252,15 +234,13 @@ func benchmark(n: int) {
     }
 }
 
-func va_test(x: int, ...): int
-{
+func va_test(x: int, ...): int {
     return 0;
 }
 
-typedef F = func(x: int, ...): int
+typedef F = func(x: int, ...): int;
 
-func test_lits()
-{
+func test_lits() {
     f := 3.14;
     d := 3.14d;
     i := 1;
@@ -275,8 +255,7 @@ func test_lits()
     x4 := 0b10101010 + 0b01010101;
 }
 
-func test_ops()
-{
+func test_ops() {
     pi := 3.14;
     f := 0.0;
     f = +pi;
@@ -308,47 +287,38 @@ func test_ops()
 
 const IS_DEBUG = true;
 
-func test_bool()
-{
+func test_bool() {
     b := false;
     b = true;
     i := 0;
     i = IS_DEBUG;
 }
 
-func test_ctrl(): int
-{
-    switch (1)
-    {
-        case 0:
-            return 0;
-        default:
-            return 1;
+func test_ctrl(): int {
+    switch (1) {
+    case 0:
+        return 0;
+    default:
+        return 1;
     }
-// return 0;
+//    return 0;
 }
 
 var j: int const;
 var q: int const*;
 var cv: Vector const;
 
-func f4(x: char const*)
-{
-
+func f4(x: char const*) {
 }
 
-struct ConstVector
-{
+struct ConstVector {
     x, y: int const;
 }
 
-func f5(p: int const*)
-{
-
+func f5(p: int const*) {
 }
 
-func test_convert()
-{
+func test_convert() {
     a: int const* = 0;
     b: int* = 0;
     a = b;
@@ -356,8 +326,7 @@ func test_convert()
     f5(p);
 }
 
-func test_const()
-{
+func test_const() {
     cv2 := ConstVector{1, 2};
     // cv2 = {};
     i := 0;
@@ -380,8 +349,7 @@ func test_const()
     i = int(ullong(p));
 }
 
-func test_init()
-{
+func test_init() {
     x := (:int const)0;
     y: int;
     y = 0;
@@ -389,14 +357,12 @@ func test_init()
     a: int[] = {1, 2, 3};
     // a2: int[];
     // v: void;
-    for (i: ullong = 0; i < 10; i++)
-    {
+    for (i: ullong = 0; i < 10; i++) {
         printf("%llu\n", i);
     }
 }
 
-func test_cast()
-{
+func test_cast() {
     p: int* = 0;
     a: uint64 = 0;
     // a = p;
@@ -405,10 +371,8 @@ func test_cast()
     p = (:int*)a;
 }
 
-func main(argc: int, argv: char**): int
-{
-    if (argv == 0)
-    {
+func main(argc: int, argv: char const**): int {
+    if (argv == 0) {
         printf("argv is null\n");
     }
     test_assign();

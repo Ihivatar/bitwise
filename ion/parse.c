@@ -4,13 +4,10 @@ Typespec *parse_type(void);
 Stmt *parse_stmt(void);
 Expr *parse_expr(void);
 
-Typespec* parse_type_func_param(void)
-{
-    Typespec* type = parse_type();
-    if (match_token(TOKEN_COLON))
-    {
-        if (type->kind != TYPESPEC_NAME)
-        {
+Typespec *parse_type_func_param(void) {
+    Typespec *type = parse_type();
+    if (match_token(TOKEN_COLON)) {
+        if (type->kind != TYPESPEC_NAME) {
             error_here("Colons in parameters of func types must be preceded by names.");
         }
         type = parse_type();
@@ -25,20 +22,14 @@ Typespec *parse_type_func(void) {
     expect_token(TOKEN_LPAREN);
     if (!is_token(TOKEN_RPAREN)) {
         buf_push(args, parse_type_func_param());
-        while (match_token(TOKEN_COMMA))
-        {
-            if (match_token(TOKEN_ELLIPSES))
-            {
-                if (has_varargs)
-                {
+        while (match_token(TOKEN_COMMA)) {
+            if (match_token(TOKEN_ELLIPSIS)) {
+                if (has_varargs) {
                     error_here("Multiple ellipsis instances in function type");
                 }
                 has_varargs = true;
-            }
-            else
-            {
-                if (has_varargs)
-                {
+            } else {
+                if (has_varargs) {
                     error_here("Ellipsis must be last parameter in function type");
                 }
                 buf_push(args, parse_type_func_param());
@@ -133,7 +124,7 @@ Expr *parse_expr_operand(void) {
     SrcPos pos = token.pos;
     if (is_token(TOKEN_INT)) {
         unsigned long long val = token.int_val;
-        TokenMod mod = token.mod;
+        TokenSuffix mod = token.mod;
         TokenSuffix suffix = token.suffix;
         next_token();
         return expr_int(pos, val, mod, suffix);
@@ -383,16 +374,14 @@ Stmt *parse_simple_stmt(void) {
         }
         stmt = stmt_init(pos, expr->name, NULL, parse_expr());
     } else if (match_token(TOKEN_COLON)) {
-        if (expr->kind != EXPR_NAME)
-        {
+        if (expr->kind != EXPR_NAME) {
             fatal_error_here(": must be preceded by a name");
             return NULL;
         }
-        const char* name = expr->name;
-        Typespec* type = parse_type();
-        Expr* expr = NULL;
-        if (match_token(TOKEN_ASSIGN))
-        {
+        const char *name = expr->name;
+        Typespec *type = parse_type();
+        Expr *expr = NULL;
+        if (match_token(TOKEN_ASSIGN)) {
             expr = parse_expr();
         }
         stmt = stmt_init(pos, name, type, expr);
@@ -563,7 +552,7 @@ Decl *parse_decl_aggregate(SrcPos pos, DeclKind kind) {
 Decl *parse_decl_var(SrcPos pos) {
     const char *name = parse_name();
     if (match_token(TOKEN_ASSIGN)) {
-        Expr* expr = parse_expr();
+        Expr *expr = parse_expr();
         expect_token(TOKEN_SEMICOLON);
         return decl_var(pos, name, NULL, expr);
     } else if (match_token(TOKEN_COLON)) {
@@ -583,7 +572,7 @@ Decl *parse_decl_var(SrcPos pos) {
 Decl *parse_decl_const(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_ASSIGN);
-    Expr* expr = parse_expr();
+    Expr *expr = parse_expr();
     expect_token(TOKEN_SEMICOLON);
     return decl_const(pos, name, expr);
 }
@@ -591,7 +580,7 @@ Decl *parse_decl_const(SrcPos pos) {
 Decl *parse_decl_typedef(SrcPos pos) {
     const char *name = parse_name();
     expect_token(TOKEN_ASSIGN);
-    Typespec* type = parse_type();
+    Typespec *type = parse_type();
     expect_token(TOKEN_SEMICOLON);
     return decl_typedef(pos, name, type);
 }
@@ -611,20 +600,14 @@ Decl *parse_decl_func(SrcPos pos) {
     bool has_varargs = false;
     if (!is_token(TOKEN_RPAREN)) {
         buf_push(params, parse_decl_func_param());
-        while (match_token(TOKEN_COMMA))
-        {
-            if (match_token(TOKEN_ELLIPSES))
-            {
-                if (has_varargs)
-                {
+        while (match_token(TOKEN_COMMA)) {
+            if (match_token(TOKEN_ELLIPSIS)) {
+                if (has_varargs) {
                     error_here("Multiple ellipsis in function declaration");
                 }
                 has_varargs = true;
-            }
-            else
-            {
-                if (has_varargs)
-                {
+            } else {
+                if (has_varargs) {
                     error_here("Ellipsis must be last parameter in function declaration");
                 }
                 buf_push(params, parse_decl_func_param());
@@ -640,11 +623,9 @@ Decl *parse_decl_func(SrcPos pos) {
     return decl_func(pos, name, params, buf_len(params), ret_type, has_varargs, block);
 }
 
-NoteList parse_note_list(void)
-{
-    Note* notes = NULL;
-    while (match_token(TOKEN_AT))
-    {
+NoteList parse_note_list(void) {
+    Note *notes = NULL;
+    while (match_token(TOKEN_AT)) {
         buf_push(notes, (Note){.pos = token.pos, .name = parse_name()});
     }
     return note_list(notes, buf_len(notes));

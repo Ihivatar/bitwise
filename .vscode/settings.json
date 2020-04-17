@@ -4,6 +4,24 @@
         "iterator": "c",
         "memory": "c",
         "random": "c",
-        "locale": "c"
+        "locale": "c",
+        "complex": "c",
+        "ios": "c",
+        "__functional_base": "c",
+        "__functional_base_03": "c",
+        "__hash_table": "c",
+        "__tree": "c",
+        "__tuple": "c",
+        "array": "c",
+        "chrono": "c",
+        "type_traits": "c",
+        "forward_list": "c",
+        "functional": "c",
+        "limits": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "utility": "c",
+        "istream": "c",
+        "ostream": "c"
     }
 }

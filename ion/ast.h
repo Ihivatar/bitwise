@@ -3,15 +3,13 @@ typedef struct Stmt Stmt;
 typedef struct Decl Decl;
 typedef struct Typespec Typespec;
 
-typedef struct Note
-{
+typedef struct Note {
     SrcPos pos;
-    const char* name;
+    const char *name;
 } Note;
 
-typedef struct NoteList
-{
-    Note* notes;
+typedef struct NoteList {
+    Note *notes;
     size_t num_notes;
 } NoteList;
 
@@ -36,7 +34,7 @@ struct Typespec {
     TypespecKind kind;
     SrcPos pos;
     struct Type *type;
-    Typespec* base;
+    Typespec *base;
     union {
         const char *name;
         struct {
@@ -45,7 +43,7 @@ struct Typespec {
             Typespec *ret;
             bool has_varargs;
         } func;
-        Expr* num_elems;
+        Expr *num_elems;
     };
 };
 
@@ -98,8 +96,8 @@ struct Decl {
             FuncParam *params;
             size_t num_params;
             Typespec *ret_type;
-            StmtList block;
             bool has_varargs;
+            StmtList block;
         } func;
         struct {
             Typespec *type;
@@ -168,7 +166,7 @@ struct Expr {
             TokenSuffix suffix;
         } float_lit;
         struct {
-            const char* val;
+            const char *val;
             TokenMod mod;
         } str_lit;
         const char *name;
@@ -278,7 +276,7 @@ struct Stmt {
         } assign;
         struct {
             const char *name;
-            Typespec* type;
+            Typespec *type;
             Expr *expr;
         } init;
     };

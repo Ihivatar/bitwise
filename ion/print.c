@@ -64,7 +64,7 @@ void print_expr(Expr *expr) {
     Expr *e = expr;
     switch (e->kind) {
     case EXPR_INT:
-        printf("%d", e->int_lit.val);
+        printf("%llu", e->int_lit.val);
         break;
     case EXPR_FLOAT:
         printf("%f", e->float_lit.val);
